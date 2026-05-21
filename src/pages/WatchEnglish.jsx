@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getDetails } from '../api/englishApi';
-import { ArrowLeft, Play, Info } from 'lucide-react';
+import { ArrowLeft, Play, Info, Share2 } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 
 const WatchEnglish = () => {
     const { type, id } = useParams();
     const navigate = useNavigate();
+    const { saveProgress, showToast } = useApp();
     
     const [details, setDetails] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -26,14 +28,36 @@ const WatchEnglish = () => {
                 
                 if (type === 'movies' && data.streams) {
                     setCurrentStreams(data.streams);
-                    if (data.streams.length > 0) setCurrentStreamUrl(data.streams[0].url);
+                    if (data.streams.length > 0) {
+                        setCurrentStreamUrl(data.streams[0].url);
+                        saveProgress({
+                            id: data.id || id,
+                            title: data.title,
+                            type: 'movies',
+                            poster: data.poster || data.backdrop,
+                            progress: 45, // Simulating progress indicator
+                            watchLink: `/watch/english/movies/${data.id || id}`
+                        });
+                    }
                 } else if (type === 'series' && data.episodes) {
                     const firstEp = data.episodes[0];
                     if (firstEp) {
                         setSelectedSeason(firstEp.season);
                         setSelectedEpisode(firstEp);
                         setCurrentStreams(firstEp.streams);
-                        if (firstEp.streams.length > 0) setCurrentStreamUrl(firstEp.streams[0].url);
+                        if (firstEp.streams.length > 0) {
+                            setCurrentStreamUrl(firstEp.streams[0].url);
+                            saveProgress({
+                                id: data.id || id,
+                                title: data.title,
+                                type: 'series',
+                                poster: data.poster || data.backdrop,
+                                progress: Math.min(Math.round((firstEp.episode / data.episodes.length) * 100), 100),
+                                season: firstEp.season,
+                                episode: firstEp.episode,
+                                watchLink: `/watch/english/series/${data.id || id}`
+                            });
+                        }
                     }
                 }
             } catch (err) {
@@ -47,11 +71,34 @@ const WatchEnglish = () => {
         fetchDetails();
     }, [type, id]);
 
-    // Handle Episode Change
+    // Handle Episode Change & Bookmark state
     const handleEpisodeSelect = (ep) => {
         setSelectedEpisode(ep);
         setCurrentStreams(ep.streams);
         if (ep.streams.length > 0) setCurrentStreamUrl(ep.streams[0].url);
+        
+        saveProgress({
+            id: details.id || id,
+            title: details.title,
+            type: 'series',
+            poster: details.poster || details.backdrop,
+            progress: Math.min(Math.round((ep.episode / (details.episodes?.length || 1)) * 100), 100),
+            season: ep.season,
+            episode: ep.episode,
+            watchLink: `/watch/english/series/${details.id || id}`
+        });
+        showToast(`Bookmarked Episode ${ep.episode}: "${ep.title}"`, 'success');
+    };
+
+    const handleShare = () => {
+        const shareUrl = window.location.href;
+        navigator.clipboard.writeText(shareUrl)
+            .then(() => {
+                showToast("Copied watch link to clipboard!", "success");
+            })
+            .catch(() => {
+                showToast("Failed to copy link.", "error");
+            });
     };
 
     if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-slate-600 border-t-white rounded-full"></div></div>;
@@ -64,17 +111,27 @@ const WatchEnglish = () => {
     return (
         <div className="bg-[#0a0a0a] min-h-screen">
             {/* Player Header */}
-            <div className="p-6 md:px-[120px] pt-10 flex items-center gap-4 border-b border-slate-800">
-                <button onClick={() => navigate(-1)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors">
-                    <ArrowLeft size={24} />
-                </button>
-                <div>
-                    <h1 className="text-2xl font-bold">{details.title}</h1>
-                    <p className="text-sm text-slate-400">
-                        {details.year} • {details.runtime}
-                        {type === 'series' && selectedEpisode && ` • S${selectedSeason} E${selectedEpisode.episode} - ${selectedEpisode.title}`}
-                    </p>
+            <div className="p-6 md:px-[120px] pt-10 flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => navigate(-1)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors cursor-pointer">
+                        <ArrowLeft size={24} />
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-bold">{details.title}</h1>
+                        <p className="text-sm text-slate-400">
+                            {details.year} • {details.runtime}
+                            {type === 'series' && selectedEpisode && ` • S${selectedSeason} E${selectedEpisode.episode} - ${selectedEpisode.title}`}
+                        </p>
+                    </div>
                 </div>
+                
+                <button 
+                    onClick={handleShare}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 text-white rounded-full transition-all duration-300 font-semibold text-sm cursor-pointer shadow-md hover:scale-105"
+                >
+                    <Share2 size={16} />
+                    <span className="hidden sm:inline">Share Link</span>
+                </button>
             </div>
 
             {/* Main Player Area */}

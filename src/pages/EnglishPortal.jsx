@@ -62,11 +62,17 @@ const EnglishPortal = ({ type = 'movies' }) => {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen text-slate-400">
-                <div className="animate-spin w-10 h-10 border-4 border-slate-600 border-t-white rounded-full"></div>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-400">
+                <div className="relative w-20 h-20 mb-4 animate-in zoom-in duration-500">
+                    <div className="absolute inset-0 border-4 border-blue-500/10 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-t-blue-500 rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 m-auto w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-lg shadow-blue-500/20">S</div>
+                </div>
+                <p className="text-sm font-bold tracking-widest text-slate-500 uppercase animate-pulse">Loading {titleType}...</p>
             </div>
         );
     }
+
 
     return (
         <div className="pb-20">
