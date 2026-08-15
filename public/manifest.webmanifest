@@ -1,0 +1,24 @@
+{
+  "name": "Streamda — English & Tamil Movies",
+  "short_name": "Streamda",
+  "description": "A fast, beautiful streaming portal for the latest English movies & series and Tamil movies.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "categories": ["entertainment", "video"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Search", "url": "/search", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "English Movies", "url": "/english" },
+    { "name": "Tamil Movies", "url": "/tamil" },
+    { "name": "My Space", "url": "/profile" }
+  ]
+}

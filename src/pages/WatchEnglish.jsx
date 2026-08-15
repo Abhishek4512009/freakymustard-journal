@@ -1,234 +1,387 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Share2,
+  Star,
+  Plus,
+  Check,
+  Server,
+  AlertTriangle,
+  ExternalLink,
+} from 'lucide-react';
 import { getDetails } from '../api/englishApi';
-import { ArrowLeft, Play, Info, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { usePageMeta } from '../hooks';
+import { cleanTitle } from '../lib/format';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
+import { PageLoader } from '../components/ui/Skeleton';
+import { ErrorState, EmptyState } from '../components/ui/States';
 
-const WatchEnglish = () => {
-    const { type, id } = useParams();
-    const navigate = useNavigate();
-    const { saveProgress, showToast } = useApp();
-    
-    const [details, setDetails] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    
-    // Player state
-    const [currentStreamUrl, setCurrentStreamUrl] = useState('');
-    const [selectedSeason, setSelectedSeason] = useState(1);
-    const [selectedEpisode, setSelectedEpisode] = useState(null); // Full episode object
-    const [currentStreams, setCurrentStreams] = useState([]); // List of servers
+/**
+ * English watch page (movie or series).
+ * Streams via third-party embed servers; the user picks a server and we
+ * remember the choice. Progress is recorded honestly (opened = started,
+ * no fabricated percentages).
+ */
+export default function WatchEnglish() {
+  const { type, id } = useParams();
+  const navigate = useNavigate();
+  const { saveProgress, addToWatchlist, removeFromWatchlist, isInWatchlist, showToast } = useApp();
 
-    useEffect(() => {
-        const fetchDetails = async () => {
-            setLoading(true);
-            try {
-                const data = await getDetails(type, id);
-                setDetails(data);
-                
-                if (type === 'movies' && data.streams) {
-                    setCurrentStreams(data.streams);
-                    if (data.streams.length > 0) {
-                        setCurrentStreamUrl(data.streams[0].url);
-                        saveProgress({
-                            id: data.id || id,
-                            title: data.title,
-                            type: 'movies',
-                            poster: data.poster || data.backdrop,
-                            progress: 45, // Simulating progress indicator
-                            watchLink: `/watch/english/movies/${data.id || id}`
-                        });
-                    }
-                } else if (type === 'series' && data.episodes) {
-                    const firstEp = data.episodes[0];
-                    if (firstEp) {
-                        setSelectedSeason(firstEp.season);
-                        setSelectedEpisode(firstEp);
-                        setCurrentStreams(firstEp.streams);
-                        if (firstEp.streams.length > 0) {
-                            setCurrentStreamUrl(firstEp.streams[0].url);
-                            saveProgress({
-                                id: data.id || id,
-                                title: data.title,
-                                type: 'series',
-                                poster: data.poster || data.backdrop,
-                                progress: Math.min(Math.round((firstEp.episode / data.episodes.length) * 100), 100),
-                                season: firstEp.season,
-                                episode: firstEp.episode,
-                                watchLink: `/watch/english/series/${data.id || id}`
-                            });
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error(err);
-                setError("Failed to load details. Ensure backend is running.");
-            } finally {
-                setLoading(false);
-            }
-        };
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-        fetchDetails();
-    }, [type, id]);
+  const [serverIndex, setServerIndex] = useState(0);
+  const [selectedSeason, setSelectedSeason] = useState(1);
+  const [selectedEpisode, setSelectedEpisode] = useState(null);
 
-    // Handle Episode Change & Bookmark state
-    const handleEpisodeSelect = (ep) => {
-        setSelectedEpisode(ep);
-        setCurrentStreams(ep.streams);
-        if (ep.streams.length > 0) setCurrentStreamUrl(ep.streams[0].url);
-        
-        saveProgress({
-            id: details.id || id,
-            title: details.title,
-            type: 'series',
-            poster: details.poster || details.backdrop,
-            progress: Math.min(Math.round((ep.episode / (details.episodes?.length || 1)) * 100), 100),
-            season: ep.season,
-            episode: ep.episode,
-            watchLink: `/watch/english/series/${details.id || id}`
-        });
-        showToast(`Bookmarked Episode ${ep.episode}: "${ep.title}"`, 'success');
+  usePageMeta(details ? `${cleanTitle(details.title)} — Streamda` : 'Watching — Streamda');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let started = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getDetails(type, id, controller.signal);
+        if (!data) throw new Error('Empty response');
+        setDetails(data);
+
+        if (type === 'series' && data.episodes?.length > 0) {
+          const firstEp = data.episodes[0];
+          setSelectedSeason(firstEp.season);
+          setSelectedEpisode(firstEp);
+        }
+
+        // Honest "started watching" bookmark (progress unknown for embeds).
+        if (!started) {
+          started = true;
+          saveProgress({
+            id: data.id || id,
+            title: data.title,
+            type: type === 'movies' ? 'movies' : 'series',
+            poster: data.poster || data.backdrop,
+            progress: null,
+            watchLink: `/watch/english/${type}/${data.id || id}`,
+          });
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) setError(err.message);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     };
 
-    const handleShare = () => {
-        const shareUrl = window.location.href;
-        navigator.clipboard.writeText(shareUrl)
-            .then(() => {
-                showToast("Copied watch link to clipboard!", "success");
-            })
-            .catch(() => {
-                showToast("Failed to copy link.", "error");
-            });
-    };
+    load();
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, id]);
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-slate-600 border-t-white rounded-full"></div></div>;
-    if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">{error}</div>;
-    if (!details) return <div className="min-h-screen flex items-center justify-center text-slate-500">Not found.</div>;
+  const seasons = useMemo(
+    () =>
+      type === 'series' && details?.episodes
+        ? [...new Set(details.episodes.map((ep) => ep.season))].sort((a, b) => a - b)
+        : [],
+    [type, details]
+  );
 
-    const seasons = type === 'series' ? [...new Set(details.episodes.map(ep => ep.season))].sort((a,b)=>a-b) : [];
-    const currentSeasonEpisodes = type === 'series' ? details.episodes.filter(ep => ep.season === selectedSeason).sort((a,b)=>a.episode-b.episode) : [];
+  const seasonEpisodes = useMemo(
+    () =>
+      type === 'series' && details?.episodes
+        ? details.episodes
+            .filter((ep) => ep.season === selectedSeason)
+            .sort((a, b) => a.episode - b.episode)
+        : [],
+    [type, details, selectedSeason]
+  );
 
-    return (
-        <div className="bg-[#0a0a0a] min-h-screen">
-            {/* Player Header */}
-            <div className="p-6 md:px-[120px] pt-10 flex items-center justify-between border-b border-slate-800">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition-colors cursor-pointer">
-                        <ArrowLeft size={24} />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold">{details.title}</h1>
-                        <p className="text-sm text-slate-400">
-                            {details.year} • {details.runtime}
-                            {type === 'series' && selectedEpisode && ` • S${selectedSeason} E${selectedEpisode.episode} - ${selectedEpisode.title}`}
-                        </p>
-                    </div>
-                </div>
-                
-                <button 
-                    onClick={handleShare}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 text-white rounded-full transition-all duration-300 font-semibold text-sm cursor-pointer shadow-md hover:scale-105"
-                >
-                    <Share2 size={16} />
-                    <span className="hidden sm:inline">Share Link</span>
-                </button>
-            </div>
+  const currentStreams = useMemo(() => {
+    if (!details) return [];
+    if (type === 'movies') return details.streams || [];
+    return selectedEpisode?.streams || [];
+  }, [details, type, selectedEpisode]);
 
-            {/* Main Player Area */}
-            <div className="max-w-7xl mx-auto md:px-[120px] py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                {/* Video Container (Spans 2 cols on lg) */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-slate-800 relative">
-                        {currentStreamUrl ? (
-                            <iframe 
-                                src={currentStreamUrl} 
-                                className="w-full h-full" 
-                                allowFullScreen 
-                                title="Video Player"
-                            ></iframe>
-                        ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-                                No streams available.
-                            </div>
-                        )}
-                    </div>
+  const currentStream = currentStreams[Math.min(serverIndex, currentStreams.length - 1)];
 
-                    {/* Server Selection */}
-                    <div>
-                        <h3 className="text-lg font-bold mb-3">Select Server</h3>
-                        <div className="flex flex-wrap gap-2">
-                            {currentStreams.map((s, idx) => (
-                                <button 
-                                    key={idx}
-                                    onClick={() => setCurrentStreamUrl(s.url)}
-                                    className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${currentStreamUrl === s.url ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-                                >
-                                    {s.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+  const selectEpisode = (ep) => {
+    setSelectedEpisode(ep);
+    setServerIndex(0);
+    saveProgress({
+      id: details.id || id,
+      title: details.title,
+      type: 'series',
+      poster: details.poster || details.backdrop,
+      progress: null,
+      season: ep.season,
+      episode: ep.episode,
+      watchLink: `/watch/english/series/${details.id || id}`,
+    });
+    showToast(`Now playing S${ep.season} E${ep.episode}: "${ep.title}"`, 'info');
+  };
 
-                    {/* Movie/Series Info */}
-                    <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50">
-                        <p className="text-slate-300 leading-relaxed mb-4">{details.description}</p>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div><span className="text-slate-500">Genres:</span> {details.genres?.join(', ')}</div>
-                            <div><span className="text-slate-500">Rating:</span> ⭐ {details.rating}</div>
-                            {details.director && <div><span className="text-slate-500">Director:</span> {details.director.join(', ')}</div>}
-                            {details.cast && <div className="col-span-2"><span className="text-slate-500">Cast:</span> {details.cast.join(', ')}</div>}
-                        </div>
-                    </div>
-                </div>
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      showToast('Watch link copied to clipboard', 'success');
+    } catch {
+      showToast('Could not copy the link', 'error');
+    }
+  };
 
-                {/* Sidebar (Episodes or Recommendations) */}
-                <div className="lg:col-span-1">
-                    {type === 'series' ? (
-                        <div className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden flex flex-col h-[600px]">
-                            {/* Season Selector */}
-                            <div className="p-4 border-b border-slate-700/50 bg-slate-800/80">
-                                <select 
-                                    value={selectedSeason} 
-                                    onChange={(e) => setSelectedSeason(parseInt(e.target.value))}
-                                    className="w-full bg-slate-900 border border-slate-700 text-white rounded p-2 focus:outline-none"
-                                >
-                                    {seasons.map(s => <option key={s} value={s}>Season {s}</option>)}
-                                </select>
-                            </div>
-                            
-                            {/* Episode List */}
-                            <div className="flex-1 overflow-y-auto hide-scrollbar p-2 space-y-2">
-                                {currentSeasonEpisodes.map(ep => (
-                                    <button 
-                                        key={ep.id}
-                                        onClick={() => handleEpisodeSelect(ep)}
-                                        className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${selectedEpisode?.id === ep.id ? 'bg-blue-600/20 border border-blue-500/50' : 'hover:bg-slate-800 border border-transparent'}`}
-                                    >
-                                        <div className="w-24 shrink-0 aspect-video bg-slate-900 rounded overflow-hidden relative">
-                                            {ep.thumbnail ? <img src={ep.thumbnail} alt={ep.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-xs text-slate-600">No Img</div>}
-                                            {selectedEpisode?.id === ep.id && <div className="absolute inset-0 bg-blue-600/20 flex items-center justify-center"><Play size={16} className="text-white fill-current" /></div>}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-sm font-bold text-white truncate">{ep.episode}. {ep.title}</div>
-                                            <div className="text-xs text-slate-500 truncate">{ep.released?.split('T')[0] || 'Unknown Date'}</div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="bg-slate-800/30 rounded-xl p-6 border border-slate-700/50 text-center">
-                            <Info size={32} className="mx-auto text-slate-500 mb-4" />
-                            <h3 className="text-lg font-bold text-slate-300">Enjoy the Movie</h3>
-                            <p className="text-sm text-slate-500 mt-2">Make sure to select the server that loads fastest for your region.</p>
-                        </div>
-                    )}
-                </div>
+  if (loading) return <PageLoader label="Loading player" />;
+  if (error) return <ErrorState message={error} onRetry={() => window.location.reload()} />;
+  if (!details) return <EmptyState title="Title not found" />;
 
-            </div>
+  const title = cleanTitle(details.title);
+  const isAdded = isInWatchlist(details.id || id);
+
+  const toggleWatchlist = () => {
+    if (isAdded) {
+      removeFromWatchlist(details.id || id);
+      showToast(`Removed "${title}" from Watchlist`, 'info');
+    } else {
+      addToWatchlist({
+        id: details.id || id,
+        title: details.title,
+        type,
+        poster: details.poster || details.backdrop,
+        year: details.year,
+        rating: details.rating,
+      });
+      showToast(`Added "${title}" to Watchlist`, 'success');
+    }
+  };
+
+  return (
+    <div className="min-h-screen pb-16">
+      {/* Header */}
+      <div className="px-4 md:px-10 pt-6 md:pt-10 pb-5 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Go back"
+            className="p-2.5 bg-ink-800 hover:bg-ink-700 rounded-full transition-colors cursor-pointer shrink-0"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-black text-white truncate font-display">
+              {title}
+            </h1>
+            <p className="text-xs md:text-sm text-slate-400 truncate">
+              {details.year} {details.runtime && `· ${details.runtime}`}
+              {details.rating && ` · ⭐ ${details.rating}`}
+              {type === 'series' && selectedEpisode && (
+                <span className="text-brand-300 font-semibold">
+                  {' '}
+                  · S{selectedSeason} E{selectedEpisode.episode}
+                </span>
+              )}
+            </p>
+          </div>
         </div>
-    );
-};
 
-export default WatchEnglish;
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={toggleWatchlist}
+            aria-label={isAdded ? 'Remove from watchlist' : 'Add to watchlist'}
+            aria-pressed={isAdded}
+          >
+            {isAdded ? <Check size={18} className="text-brand-400" /> : <Plus size={18} />}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleShare}>
+            <Share2 size={14} /> <span className="hidden sm:inline">Share</span>
+          </Button>
+        </div>
+      </div>
+
+      <div className="px-4 md:px-10 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 xl:gap-8 max-w-[1600px] mx-auto">
+        {/* Player column */}
+        <div className="space-y-5 min-w-0">
+          <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-ink-700 shadow-card">
+            {currentStream ? (
+              <iframe
+                key={currentStream.url}
+                src={currentStream.url}
+                className="w-full h-full"
+                title={`${title} player`}
+                allowFullScreen
+                allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                referrerPolicy="no-referrer"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+              />
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500">
+                <AlertTriangle size={28} />
+                <p className="text-sm font-semibold">No streams available for this title.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Server picker */}
+          {currentStreams.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">
+                <Server size={13} /> Servers
+              </span>
+              {currentStreams.map((s, idx) => (
+                <button
+                  key={s.url}
+                  onClick={() => setServerIndex(idx)}
+                  aria-pressed={idx === serverIndex}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all duration-200 cursor-pointer ${
+                    idx === serverIndex
+                      ? 'bg-brand-500 border-brand-400 text-white shadow-glow'
+                      : 'bg-ink-800 border-ink-700 text-slate-300 hover:border-brand-500/40 hover:text-white'
+                  }`}
+                >
+                  {s.name || `Server ${idx + 1}`}
+                </button>
+              ))}
+              <a
+                href={currentStream?.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Open in new tab <ExternalLink size={11} />
+              </a>
+            </div>
+          )}
+
+          {/* About */}
+          <div className="bg-ink-900/70 border border-ink-700/60 rounded-2xl p-5 md:p-6">
+            <h2 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
+              About
+            </h2>
+            <p className="text-sm text-slate-300 leading-relaxed mb-4">
+              {details.description || 'No description available.'}
+            </p>
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {(details.genres || []).map((g) => (
+                <Badge key={g} tone="brand">
+                  {g}
+                </Badge>
+              ))}
+            </div>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+              {details.rating && (
+                <div className="flex gap-2">
+                  <dt className="text-slate-500 shrink-0">Rating</dt>
+                  <dd className="text-white font-semibold flex items-center gap-1">
+                    <Star size={12} className="fill-amber-400 text-amber-400" /> {details.rating}
+                  </dd>
+                </div>
+              )}
+              {details.director?.length > 0 && (
+                <div className="flex gap-2">
+                  <dt className="text-slate-500 shrink-0">Director</dt>
+                  <dd className="text-white">{details.director.join(', ')}</dd>
+                </div>
+              )}
+              {details.cast?.length > 0 && (
+                <div className="flex gap-2 sm:col-span-2">
+                  <dt className="text-slate-500 shrink-0">Cast</dt>
+                  <dd className="text-white">{details.cast.join(', ')}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        </div>
+
+        {/* Side column */}
+        <aside className="min-w-0">
+          {type === 'series' ? (
+            <div className="bg-ink-900/70 border border-ink-700/60 rounded-2xl overflow-hidden flex flex-col max-h-[75vh] lg:sticky lg:top-6">
+              <div className="p-4 border-b border-ink-700/60 bg-ink-800/60">
+                <label
+                  htmlFor="season-select"
+                  className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2"
+                >
+                  Season
+                </label>
+                <select
+                  id="season-select"
+                  value={selectedSeason}
+                  onChange={(e) => setSelectedSeason(parseInt(e.target.value, 10))}
+                  className="w-full bg-ink-900 border border-ink-700 text-white text-sm rounded-lg p-2.5 focus:outline-none focus:border-brand-500/60 cursor-pointer"
+                >
+                  {seasons.map((s) => (
+                    <option key={s} value={s}>
+                      Season {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
+                {seasonEpisodes.map((ep) => {
+                  const active =
+                    selectedEpisode?.id === ep.id || selectedEpisode?.episode === ep.episode;
+                  return (
+                    <button
+                      key={ep.id || ep.episode}
+                      onClick={() => selectEpisode(ep)}
+                      aria-current={active}
+                      className={`w-full flex items-center gap-3 p-2 rounded-xl transition-colors text-left cursor-pointer border ${
+                        active
+                          ? 'bg-brand-500/15 border-brand-500/40'
+                          : 'hover:bg-ink-800 border-transparent'
+                      }`}
+                    >
+                      <div className="w-24 shrink-0 aspect-video bg-ink-950 rounded-lg overflow-hidden relative">
+                        {ep.thumbnail ? (
+                          <img
+                            src={ep.thumbnail}
+                            alt=""
+                            loading="lazy"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-600 font-bold">
+                            E{ep.episode}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={`text-sm font-bold truncate ${active ? 'text-brand-300' : 'text-white'}`}
+                        >
+                          {ep.episode}. {ep.title}
+                        </p>
+                        <p className="text-[11px] text-slate-500 truncate">
+                          {ep.released?.split('T')[0] || ''}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-ink-900/70 border border-ink-700/60 rounded-2xl p-6 text-center lg:sticky lg:top-6">
+              <h3 className="text-base font-bold text-white mb-2">Tips</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                If a server buffers or shows ads, switch to another one below the player. Streams
+                open in a sandboxed frame for your safety.
+              </p>
+              <Link
+                to="/english"
+                className="inline-block mt-5 text-xs font-bold text-brand-300 hover:text-brand-200 transition-colors"
+              >
+                Browse more movies →
+              </Link>
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}

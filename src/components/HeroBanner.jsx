@@ -1,131 +1,186 @@
-import React, { useState } from 'react';
-import { Play, Plus, Check, Film } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Play, Plus, Check, Star } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import TrailerModal from './TrailerModal';
+import { cleanTitle, watchLinkFor, ratingColor } from '../lib/format';
+import Badge from './ui/Badge';
 
-const HeroBanner = ({ movie, type = "movies" }) => {
-    const { addToWatchlist, removeFromWatchlist, isInWatchlist, saveProgress } = useApp();
-    const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+const ROTATE_MS = 8000;
 
-    if (!movie) {
-        return (
-            <div className="relative h-[50vh] md:h-[80vh] w-full bg-slate-900 animate-pulse flex items-center justify-center">
-                <span className="text-slate-500">Loading Banner...</span>
-            </div>
-        );
-    }
+/**
+ * Cinematic hero with auto-rotating slides, backdrop crossfade,
+ * watchlist toggle and watch CTA.
+ */
+export default function HeroBanner({ movies = [], type = 'movies' }) {
+  const { addToWatchlist, removeFromWatchlist, isInWatchlist, showToast } = useApp();
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
 
-    const movieId = movie.id || movie.link;
-    const isAdded = isInWatchlist(movieId);
+  const slides = useMemo(
+    () => (movies || []).filter((m) => m && (m.backdrop || m.poster)).slice(0, 6),
+    [movies]
+  );
 
-    const backdrop = movie.backdrop || movie.poster || 'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?q=80&w=2670&auto=format&fit=crop';
-    
-    // Fallback watch link resolver
-    const watchLink = movie.link 
-        ? `/watch/tamil/${encodeURIComponent(movie.link)}?title=${encodeURIComponent(movie.title)}`
-        : `/watch/english/${type}/${movie.id}`;
+  const count = slides.length;
 
-    const handleWatchlistToggle = () => {
-        if (isAdded) {
-            removeFromWatchlist(movieId);
-        } else {
-            addToWatchlist({
-                id: movieId,
-                title: movie.title,
-                type: movie.link ? 'movies' : type,
-                poster: movie.poster || movie.backdrop,
-                year: movie.year,
-                rating: movie.rating,
-                link: movie.link
-            });
-        }
-    };
+  useEffect(() => {
+    if (count < 2 || paused) return;
+    const timer = setInterval(() => setIndex((i) => (i + 1) % count), ROTATE_MS);
+    return () => clearInterval(timer);
+  }, [count, paused]);
 
-    const handlePlayClick = () => {
-        // Save initial progress of 10% when starting from Hero to trigger Continue Watching shelf
-        saveProgress({
-            id: movieId,
-            title: movie.title,
-            type: movie.link ? 'movies' : type,
-            poster: movie.poster || movie.backdrop,
-            progress: 10,
-            watchLink: watchLink
-        });
-    };
+  const goTo = useCallback((i) => setIndex(((i % count) + count) % count), [count]);
 
+  if (count === 0) {
     return (
-        <>
-            <div className="relative h-[65vh] md:h-[85vh] w-full overflow-hidden">
-                {/* Background Image */}
-                <div className="absolute inset-0 bg-black">
-                    <img 
-                        src={backdrop} 
-                        alt={movie.title} 
-                        className="w-full h-full object-cover opacity-60 mix-blend-screen scale-105 animate-in fade-in zoom-in duration-1000"
-                    />
-                </div>
-
-                {/* Gradient Masks (JioHotstar style) */}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/60 to-transparent w-full md:w-[80%]"></div>
-
-                {/* Content Container */}
-                <div className="absolute bottom-[12%] md:bottom-[20%] left-4 md:left-8 right-4 max-w-2xl space-y-4 md:space-y-6 z-10">
-                    <h1 className="text-3xl md:text-6xl font-black text-white drop-shadow-2xl tracking-tight line-clamp-2 leading-tight">
-                        {movie.title?.replace(/\(\d{4}\)/, '')}
-                    </h1>
-                    
-                    {/* Meta details */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs md:text-base text-gray-300 font-medium">
-                        {movie.year && <span>{movie.year}</span>}
-                        {movie.rating && <span>⭐ {movie.rating}</span>}
-                        {movie.runtime && <span>{movie.runtime}</span>}
-                        {movie.genres && movie.genres.length > 0 && (
-                            <span className="hidden sm:inline">• {movie.genres.slice(0, 3).join(', ')}</span>
-                        )}
-                    </div>
-
-                    <p className="text-sm md:text-lg text-gray-350 drop-shadow-md max-w-xl line-clamp-2 md:line-clamp-3 leading-relaxed">
-                        {movie.description || "Experience the latest blockbuster in high quality."}
-                    </p>
-
-                    {/* Action Triggers */}
-                    <div className="flex flex-wrap items-center gap-3 pt-2 md:pt-4">
-                        <Link
-                            to={watchLink}
-                            onClick={handlePlayClick}
-                            className="flex items-center gap-2 bg-white text-black px-5 py-2.5 md:px-7 md:py-3.5 rounded-xl hover:bg-slate-200 transition-all duration-300 font-bold text-sm md:text-base shadow-lg hover:scale-105"
-                        >
-                            <Play size={18} className="fill-current" /> Watch Now
-                        </Link>
-                        
-                        <button
-                            onClick={() => setIsTrailerOpen(true)}
-                            className="flex items-center gap-2 bg-slate-900/60 backdrop-blur-md border border-slate-800 text-white px-5 py-2.5 md:px-7 md:py-3.5 rounded-xl hover:bg-slate-800 transition-all duration-300 font-bold text-sm md:text-base hover:scale-105"
-                        >
-                            <Film size={18} /> Trailer
-                        </button>
-
-                        <button 
-                            onClick={handleWatchlistToggle}
-                            className={`flex items-center justify-center w-10 h-10 md:w-13 md:h-13 bg-slate-900/60 backdrop-blur-md border rounded-xl hover:bg-slate-800 transition-all duration-300 hover:scale-105 ${isAdded ? 'border-blue-500/50 text-blue-400' : 'border-slate-800 text-white'}`}
-                            title={isAdded ? 'Remove from Watchlist' : 'Add to Watchlist'}
-                        >
-                            {isAdded ? <Check size={20} /> : <Plus size={20} />}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Custom Trailer Modal */}
-            <TrailerModal 
-                isOpen={isTrailerOpen}
-                onClose={() => setIsTrailerOpen(false)}
-                movieTitle={movie.title}
-            />
-        </>
+      <div className="relative h-[55vh] md:h-[78vh] w-full bg-gradient-to-b from-ink-900 to-ink-950 flex items-center justify-center">
+        <div className="text-center px-6">
+          <h1 className="text-3xl md:text-5xl font-black font-display text-gradient-brand mb-3">
+            STREAMDA
+          </h1>
+          <p className="text-slate-400 text-sm md:text-base max-w-md mx-auto">
+            English blockbusters, binge-worthy series and the latest Tamil cinema — all in one
+            place.
+          </p>
+        </div>
+      </div>
     );
-};
+  }
 
-export default HeroBanner;
+  const movie = slides[index];
+  const movieId = movie.id || movie.link;
+  const isAdded = isInWatchlist(movieId);
+  const link = watchLinkFor(movie, type);
+  const title = cleanTitle(movie.title);
+
+  const toggleWatchlist = () => {
+    if (isAdded) {
+      removeFromWatchlist(movieId);
+      showToast(`Removed "${title}" from Watchlist`, 'info');
+    } else {
+      addToWatchlist({
+        id: movieId,
+        title: movie.title,
+        type: movie.link ? 'tamil' : type,
+        poster: movie.poster || movie.backdrop,
+        year: movie.year,
+        rating: movie.rating,
+        link: movie.link,
+      });
+      showToast(`Added "${title}" to Watchlist`, 'success');
+    }
+  };
+
+  return (
+    <section
+      aria-label="Featured titles"
+      className="relative h-[62vh] md:h-[82vh] w-full overflow-hidden"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* Crossfading backdrops (all mounted for smooth transitions) */}
+      {slides.map((m, i) => (
+        <div
+          key={m.id || m.link || i}
+          aria-hidden="true"
+          className={`absolute inset-0 transition-opacity duration-1000 ${i === index ? 'opacity-100' : 'opacity-0'}`}
+        >
+          <img
+            src={m.backdrop || m.poster}
+            alt=""
+            className={`w-full h-full object-cover ${i === index ? 'scale-105' : 'scale-100'} transition-transform duration-[9000ms] ease-linear`}
+            loading={i === 0 ? 'eager' : 'lazy'}
+          />
+        </div>
+      ))}
+
+      {/* Gradient masks */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/35 to-ink-950/10"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-r from-ink-950/95 via-ink-950/50 to-transparent"
+      />
+
+      {/* Content */}
+      <div className="absolute bottom-[14%] md:bottom-[18%] left-4 md:left-12 right-4 max-w-2xl space-y-4 md:space-y-5 z-10">
+        <div key={movieId} className="space-y-4 md:space-y-5 animate-fade-in-up">
+          <h1 className="text-3xl md:text-6xl font-black text-white drop-shadow-2xl tracking-tight line-clamp-2 leading-[1.05] font-display">
+            {title}
+          </h1>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs md:text-sm text-slate-300 font-semibold">
+            {movie.rating && (
+              <span className={`flex items-center gap-1 ${ratingColor(movie.rating)}`}>
+                <Star size={13} className="fill-current" /> {movie.rating}
+              </span>
+            )}
+            {movie.year && <span>{movie.year}</span>}
+            {movie.runtime && <span>{movie.runtime}</span>}
+            {movie.genres?.length > 0 && (
+              <span className="hidden sm:inline text-slate-400">
+                {movie.genres.slice(0, 3).join(' · ')}
+              </span>
+            )}
+          </div>
+
+          <p className="text-sm md:text-base text-slate-300/90 drop-shadow-md max-w-xl line-clamp-2 md:line-clamp-3 leading-relaxed">
+            {movie.description || 'Experience the latest blockbuster in high quality.'}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <Link
+              to={link}
+              className="flex items-center gap-2 bg-white text-ink-950 px-6 py-3 md:px-8 md:py-3.5 rounded-xl hover:bg-slate-200 transition-all duration-200 font-bold text-sm md:text-base shadow-card hover:scale-[1.04] active:scale-[0.98]"
+            >
+              <Play size={18} className="fill-current" /> Watch Now
+            </Link>
+
+            <button
+              onClick={toggleWatchlist}
+              aria-pressed={isAdded}
+              className={`flex items-center gap-2 px-5 py-3 md:py-3.5 rounded-xl glass border font-bold text-sm md:text-base transition-all duration-200 hover:scale-[1.04] active:scale-[0.98] cursor-pointer ${
+                isAdded
+                  ? 'border-brand-500/50 text-brand-300'
+                  : 'border-white/10 text-white hover:bg-white/15'
+              }`}
+            >
+              {isAdded ? <Check size={17} /> : <Plus size={17} />}
+              {isAdded ? 'In Watchlist' : 'Watchlist'}
+            </button>
+
+            {movie.type === 'series' || type === 'series' ? (
+              <Badge tone="accent" className="ml-1">
+                SERIES
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Slide indicators */}
+      {count > 1 && (
+        <div
+          className="absolute bottom-6 left-4 md:left-12 z-20 flex items-center gap-2"
+          role="tablist"
+          aria-label="Featured slides"
+        >
+          {slides.map((m, i) => (
+            <button
+              key={m.id || m.link || i}
+              role="tab"
+              aria-selected={i === index}
+              aria-label={`Show slide ${i + 1}: ${cleanTitle(m.title)}`}
+              onClick={() => goTo(i)}
+              className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                i === index ? 'w-8 bg-brand-400' : 'w-3 bg-white/25 hover:bg-white/50'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}

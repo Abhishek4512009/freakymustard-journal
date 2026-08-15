@@ -1,129 +1,197 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import HeroBanner from '../components/HeroBanner';
 import MovieCarousel from '../components/MovieCarousel';
-import { getYears, getMovies, searchMovies } from '../api/tamilApi';
-import { Search } from 'lucide-react';
+import SectionHeader from '../components/SectionHeader';
+import PosterCard from '../components/PosterCard';
+import Button from '../components/ui/Button';
+import { ErrorState } from '../components/ui/States';
+import { Skeleton } from '../components/ui/Skeleton';
+import { usePageMeta } from '../hooks';
+import { getYears, getMovies } from '../api/tamilApi';
+import { Loader2, ChevronDown } from 'lucide-react';
 
-const TamilPortal = () => {
-    const [years, setYears] = useState([]);
-    const [yearCarousels, setYearCarousels] = useState({});
-    const [searchResults, setSearchResults] = useState([]);
-    const [query, setQuery] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [searching, setSearching] = useState(false);
-    const [heroMovie, setHeroMovie] = useState(null);
+/**
+ * Tamil portal: hero + year shelves.
+ * Selecting a year chip switches to a full grid for that year with
+ * "load more" pagination (backend pages param).
+ */
+export default function TamilPortal() {
+  usePageMeta(
+    'Tamil Movies — Streamda',
+    'Watch the latest Tamil movies by year — 2026 back to classics.'
+  );
 
-    useEffect(() => {
-        const fetchPortalData = async () => {
-            setLoading(true);
-            try {
-                const yearsData = await getYears();
-                if (yearsData && yearsData.length > 0) {
-                    setYears(yearsData);
-                    
-                    // Fetch first 3 years to populate some initial rows
-                    const rowsToFetch = yearsData.slice(0, 3);
-                    const carouselsData = {};
-                    
-                    for (const year of rowsToFetch) {
-                        try {
-                            const movies = await getMovies(year.link, 1);
-                            carouselsData[year.name] = movies;
-                            
-                            // Set Hero to the first movie of the latest year
-                            if (!heroMovie && movies && movies.length > 0) {
-                                setHeroMovie(movies[0]);
-                            }
-                        } catch(e) {
-                            console.error(`Failed to fetch movies for ${year.name}`);
-                        }
-                    }
-                    setYearCarousels(carouselsData);
-                }
-            } catch (err) {
-                console.error("Failed to fetch tamil data:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
+  const [years, setYears] = useState([]);
+  const [rows, setRows] = useState([]); // [{ name, movies }]
+  const [activeYear, setActiveYear] = useState(null); // { name, link }
+  const [yearMovies, setYearMovies] = useState([]);
+  const [yearPages, setYearPages] = useState(1);
+  const [loadingYear, setLoadingYear] = useState(false);
+  const [phase, setPhase] = useState('loading');
+  const [error, setError] = useState(null);
 
-        fetchPortalData();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!query.trim()) {
-            setSearchResults([]);
-            return;
+    const load = async () => {
+      setPhase('loading');
+      setError(null);
+      try {
+        const yearsData = await getYears(signal);
+        if (!yearsData?.length) throw new Error('No years available.');
+        setYears(yearsData);
+
+        // First 3 years as shelves — in parallel.
+        const firstYears = yearsData.slice(0, 3);
+        const settled = await Promise.allSettled(
+          firstYears.map((y) => getMovies(y.link, 1, signal))
+        );
+        const built = settled
+          .map((res, i) =>
+            res.status === 'fulfilled' && res.value.length > 0
+              ? { name: firstYears[i].name.replace('Moviesda ', ''), movies: res.value }
+              : null
+          )
+          .filter(Boolean);
+        setRows(built);
+        setPhase('ready');
+      } catch (err) {
+        if (!signal.aborted) {
+          setError(err.message);
+          setPhase('error');
         }
-        setSearching(true);
-        try {
-            const res = await searchMovies(query);
-            if (res) {
-                // Filter out navigation/collection links based on title
-                const filtered = res.filter(m => !m.title.startsWith('Tamil') && !m.title.includes('Movies'));
-                setSearchResults(filtered);
-            }
-        } catch (err) {
-            console.error("Search failed:", err);
-        } finally {
-            setSearching(false);
-        }
+      }
     };
 
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-400">
-                <div className="relative w-20 h-20 mb-4 animate-in zoom-in duration-500">
-                    <div className="absolute inset-0 border-4 border-blue-500/10 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-t-blue-500 rounded-full animate-spin"></div>
-                    <div className="absolute inset-0 m-auto w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-lg shadow-blue-500/20">S</div>
-                </div>
-                <p className="text-sm font-bold tracking-widest text-slate-500 uppercase animate-pulse">Loading Tamil Portal...</p>
-            </div>
-        );
+    load();
+    return () => controller.abort();
+  }, []);
+
+  const openYear = async (year, pages = 1, append = false) => {
+    setLoadingYear(true);
+    try {
+      const movies = await getMovies(year.link, pages);
+      setYearMovies((prev) => (append ? [...prev, ...movies] : movies));
+      setYearPages(pages);
+      setActiveYear(year);
+    } catch {
+      /* keep previous */
+    } finally {
+      setLoadingYear(false);
     }
+  };
 
+  const heroPool = useMemo(() => {
+    const first = rows[0]?.movies || [];
+    return first.filter((m) => m.poster).slice(0, 5);
+  }, [rows]);
 
-    return (
-        <div className="pb-20">
-            {/* Conditional Hero: Hide when searching */}
-            {searchResults.length === 0 && <HeroBanner movie={heroMovie} type="movies" />}
-            
-            <div className={`${searchResults.length === 0 ? '-mt-16' : 'pt-24'} relative z-20 space-y-12`}>
-                
-                {/* Search Bar */}
-                <div className="px-[10%] md:px-[120px]">
-                    <form onSubmit={handleSearch} className="relative max-w-xl">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input 
-                            type="text" 
-                            placeholder="Search Tamil Movies..."
-                            value={query}
-                            onChange={(e) => {
-                                setQuery(e.target.value);
-                                if(e.target.value === '') setSearchResults([]);
-                            }}
-                            className="w-full bg-slate-800/80 backdrop-blur border border-slate-700 text-white rounded-full py-3 pl-12 pr-4 focus:outline-none focus:border-slate-500 transition-colors"
-                        />
-                    </form>
-                </div>
+  if (phase === 'error') {
+    return <ErrorState message={error} onRetry={() => window.location.reload()} />;
+  }
 
-                {/* Content Rows */}
-                {searching ? (
-                    <div className="pl-[10%] md:pl-[120px] text-slate-400">Searching...</div>
-                ) : searchResults.length > 0 ? (
-                    <MovieCarousel title={`Search Results for "${query}"`} movies={searchResults} type="movies" />
-                ) : (
-                    <>
-                        {Object.entries(yearCarousels).map(([yearName, movies]) => (
-                            <MovieCarousel key={yearName} title={yearName.replace('Moviesda ', '')} movies={movies} type="movies" />
-                        ))}
-                    </>
-                )}
+  const loading = phase === 'loading';
+
+  return (
+    <div className="pb-16">
+      <HeroBanner movies={heroPool} type="movies" />
+
+      <div className="-mt-14 md:-mt-20 relative z-20 space-y-10 md:space-y-12">
+        {/* Year chips */}
+        {!loading && years.length > 0 && (
+          <div className="px-4 md:px-8">
+            <div
+              className="flex gap-2 overflow-x-auto hide-scrollbar py-1"
+              role="tablist"
+              aria-label="Years"
+            >
+              {years.map((y) => {
+                const label = y.name.replace('Moviesda ', '').replace(' Movies', '');
+                const isActive = activeYear?.name === y.name;
+                return (
+                  <button
+                    key={y.name}
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => (isActive ? setActiveYear(null) : openYear(y))}
+                    className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap border transition-all duration-200 cursor-pointer ${
+                      isActive
+                        ? 'bg-brand-500 border-brand-400 text-white shadow-glow'
+                        : 'bg-ink-800/80 border-ink-700 text-slate-300 hover:border-brand-500/40 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
-        </div>
-    );
-};
+          </div>
+        )}
 
-export default TamilPortal;
+        {/* Active year grid */}
+        {activeYear && (
+          <section aria-label={`${activeYear.name} movies`}>
+            <SectionHeader
+              title={activeYear.name.replace('Moviesda ', '')}
+              subtitle={
+                loadingYear && yearMovies.length === 0 ? 'Fetching…' : `${yearMovies.length} movies`
+              }
+            />
+            {yearMovies.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 px-4 md:px-8">
+                  {yearMovies.map((m, i) => (
+                    <PosterCard key={m.link || i} item={m} type="movies" fluid />
+                  ))}
+                </div>
+                <div className="flex justify-center mt-8">
+                  <Button
+                    variant="secondary"
+                    onClick={() => openYear(activeYear, yearPages + 1, true)}
+                    disabled={loadingYear}
+                  >
+                    {loadingYear ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )}
+                    Load more
+                  </Button>
+                </div>
+              </>
+            ) : loadingYear ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 px-4 md:px-8">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[2/3]" />
+                ))}
+              </div>
+            ) : null}
+          </section>
+        )}
+
+        {/* Year shelves */}
+        {rows.map((row) => (
+          <section key={row.name} aria-label={row.name}>
+            <SectionHeader title={row.name} />
+            <MovieCarousel movies={row.movies.slice(0, 16)} type="movies" />
+          </section>
+        ))}
+
+        {loading && (
+          <>
+            <SectionHeader title="Tamil Cinema" />
+            <div className="flex gap-4 px-4 md:px-8">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <Skeleton
+                  key={i}
+                  className="min-w-[140px] md:min-w-[180px] w-[140px] md:w-[180px] aspect-[2/3] shrink-0"
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

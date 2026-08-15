@@ -1,16 +1,210 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-@layer base {
-  body {
-    @apply bg-slate-900 text-slate-100 antialiased;
+/* ============================================================
+   STREAMDA DESIGN SYSTEM — Tailwind v4 theme tokens
+   ============================================================ */
+
+@theme {
+  /* Brand palette */
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dce7fd;
+  --color-brand-200: #c0d4fc;
+  --color-brand-300: #94b8fa;
+  --color-brand-400: #6193f5;
+  --color-brand-500: #3b6cf6;
+  --color-brand-600: #254ceb;
+  --color-brand-700: #1d3ad8;
+  --color-brand-800: #1e32af;
+  --color-brand-900: #1e2f8a;
+  --color-brand-950: #171f54;
+
+  --color-accent-400: #a78bfa;
+  --color-accent-500: #7c3aed;
+  --color-accent-600: #6d28d9;
+
+  /* Surface scale (deep-space navy, not pure black) */
+  --color-ink-950: #05070d;
+  --color-ink-900: #0a0e18;
+  --color-ink-850: #0e1420;
+  --color-ink-800: #131a29;
+  --color-ink-700: #1c2536;
+  --color-ink-600: #2a3650;
+
+  /* Typography */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Motion */
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-scale-in: scale-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-slide-in-right: slide-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-toast-in: toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
+
+  /* Shadows */
+  --shadow-glow: 0 0 24px rgba(59, 108, 246, 0.35);
+  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-card-hover: 0 16px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(59, 108, 246, 0.25);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -200% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
   }
 }
 
-/* Hide scrollbar for clean carousels */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
+/* ============================================================
+   BASE
+   ============================================================ */
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-ink-950 text-slate-100 antialiased font-sans;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: none;
+  }
+
+  ::selection {
+    @apply bg-brand-500/40 text-white;
+  }
+
+  /* Global slim scrollbar (WebKit) */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink-600 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-600/80;
+  }
+
+  /* Visible keyboard focus everywhere */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-400);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
-.hide-scrollbar {
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+
+@utility hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility text-gradient-brand {
+  background: linear-gradient(100deg, #6193f5, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility glass {
+  background: rgba(10, 14, 24, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@utility skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--color-ink-800) 40%,
+    var(--color-ink-700) 50%,
+    var(--color-ink-800) 60%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

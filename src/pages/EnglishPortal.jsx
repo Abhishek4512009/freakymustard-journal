@@ -1,117 +1,199 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import HeroBanner from '../components/HeroBanner';
 import MovieCarousel from '../components/MovieCarousel';
-import { getPopular, searchContent } from '../api/englishApi';
-import { Search } from 'lucide-react';
+import SectionHeader from '../components/SectionHeader';
+import PosterCard from '../components/PosterCard';
+import Button from '../components/ui/Button';
+import { ErrorState } from '../components/ui/States';
+import { Skeleton } from '../components/ui/Skeleton';
+import { usePageMeta } from '../hooks';
+import { getPopular, getTop, getGenres, getByGenre } from '../api/englishApi';
+import { Loader2, ChevronDown } from 'lucide-react';
 
-const EnglishPortal = ({ type = 'movies' }) => {
-    const [popular, setPopular] = useState([]);
-    const [top, setTop] = useState([]); // In a full app, we'd fetch top rated too
-    const [searchResults, setSearchResults] = useState([]);
-    const [query, setQuery] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [searching, setSearching] = useState(false);
+/**
+ * English portal (movies or series, driven by the `type` prop).
+ * Hero + Popular + Top Rated + genre shelves with infinite "load more".
+ */
+export default function EnglishPortal({ type = 'movies' }) {
+  const isSeries = type === 'series';
+  usePageMeta(
+    `English ${isSeries ? 'Series' : 'Movies'} — Streamda`,
+    `Browse popular and top-rated English ${isSeries ? 'series' : 'movies'} by genre.`
+  );
 
-    const titleType = type === 'movies' ? 'Movies' : 'Series';
+  const [popular, setPopular] = useState([]);
+  const [top, setTop] = useState([]);
+  const [genres, setGenres] = useState([]);
+  const [activeGenre, setActiveGenre] = useState(null);
+  const [genreResults, setGenreResults] = useState([]);
+  const [genreSkip, setGenreSkip] = useState(0);
+  const [genreHasMore, setGenreHasMore] = useState(false);
+  const [loadingGenre, setLoadingGenre] = useState(false);
+  const [phase, setPhase] = useState('loading');
+  const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const fetchPortalData = async () => {
-            setLoading(true);
-            setSearchResults([]);
-            setQuery('');
-            try {
-                // Fetch Popular
-                const popData = await getPopular(type, 0);
-                if (popData && popData.results) {
-                    setPopular(popData.results);
-                }
-                
-                // Fetch Top (Re-using popular endpoint for demo, ideally we'd have a getTop function)
-                const topData = await getPopular(type, 20); // skipping 20 for variety
-                if (topData && topData.results) {
-                    setTop(topData.results);
-                }
-            } catch (err) {
-                console.error("Failed to fetch english data:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
+  // Initial load
+  useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
 
-        fetchPortalData();
-    }, [type]);
-
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!query.trim()) {
-            setSearchResults([]);
-            return;
+    const load = async () => {
+      setPhase('loading');
+      setError(null);
+      try {
+        const [popData, topData, genreData] = await Promise.all([
+          getPopular(type, 0, signal),
+          getTop(type, 0, signal).catch(() => null),
+          getGenres(signal).catch(() => null),
+        ]);
+        setPopular(popData?.results || []);
+        setTop(topData?.results || []);
+        setGenres(genreData?.genres || []);
+        setPhase('ready');
+      } catch (err) {
+        if (!signal.aborted) {
+          setError(err.message);
+          setPhase('error');
         }
-        setSearching(true);
-        try {
-            const res = await searchContent(type, query);
-            if (res && res.results) {
-                setSearchResults(res.results);
-            }
-        } catch (err) {
-            console.error("Search failed:", err);
-        } finally {
-            setSearching(false);
-        }
+      }
     };
 
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-400">
-                <div className="relative w-20 h-20 mb-4 animate-in zoom-in duration-500">
-                    <div className="absolute inset-0 border-4 border-blue-500/10 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-t-blue-500 rounded-full animate-spin"></div>
-                    <div className="absolute inset-0 m-auto w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-lg shadow-blue-500/20">S</div>
-                </div>
-                <p className="text-sm font-bold tracking-widest text-slate-500 uppercase animate-pulse">Loading {titleType}...</p>
-            </div>
-        );
+    load();
+    return () => controller.abort();
+  }, [type]);
+
+  // Reset genre selection when switching movies<->series
+  useEffect(() => {
+    // Intentional synchronous reset on route-type change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveGenre(null);
+
+    setGenreResults([]);
+  }, [type]);
+
+  const selectGenre = async (genre, append = false) => {
+    if (!genre) return;
+    setLoadingGenre(true);
+    try {
+      const skip = append ? genreSkip : 0;
+      const data = await getByGenre(type, genre, skip);
+      const results = data?.results || [];
+      setGenreResults((prev) => (append ? [...prev, ...results] : results));
+      setGenreSkip(skip + results.length);
+      setGenreHasMore(Boolean(data?.has_more) && results.length > 0);
+      if (!append) setActiveGenre(genre);
+    } catch {
+      /* keep previous results */
+    } finally {
+      setLoadingGenre(false);
     }
+  };
 
+  const heroPool = useMemo(() => popular.filter((m) => m.backdrop).slice(0, 5), [popular]);
 
-    return (
-        <div className="pb-20">
-            {/* Conditional Hero: Hide when searching */}
-            {searchResults.length === 0 && <HeroBanner movie={popular[0]} type={type} />}
-            
-            <div className={`${searchResults.length === 0 ? '-mt-16' : 'pt-24'} relative z-20 space-y-12`}>
-                
-                {/* Search Bar */}
-                <div className="px-[10%] md:px-[120px]">
-                    <form onSubmit={handleSearch} className="relative max-w-xl">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                        <input 
-                            type="text" 
-                            placeholder={`Search English ${titleType}...`}
-                            value={query}
-                            onChange={(e) => {
-                                setQuery(e.target.value);
-                                if(e.target.value === '') setSearchResults([]);
-                            }}
-                            className="w-full bg-slate-800/80 backdrop-blur border border-slate-700 text-white rounded-full py-3 pl-12 pr-4 focus:outline-none focus:border-slate-500 transition-colors"
-                        />
-                    </form>
-                </div>
+  if (phase === 'error') {
+    return <ErrorState message={error} onRetry={() => window.location.reload()} />;
+  }
 
-                {/* Content Rows */}
-                {searching ? (
-                    <div className="pl-[10%] md:pl-[120px] text-slate-400">Searching...</div>
-                ) : searchResults.length > 0 ? (
-                    <MovieCarousel title={`Search Results for "${query}"`} movies={searchResults} type={type} />
-                ) : (
-                    <>
-                        <MovieCarousel title={`Popular ${titleType}`} movies={popular.slice(1)} type={type} />
-                        <MovieCarousel title={`Top Rated ${titleType}`} movies={top} type={type} />
-                    </>
-                )}
+  const loading = phase === 'loading';
+
+  return (
+    <div className="pb-16">
+      <HeroBanner movies={heroPool} type={type} />
+
+      <div className="-mt-14 md:-mt-20 relative z-20 space-y-10 md:space-y-12">
+        {/* Genre chips */}
+        {!loading && genres.length > 0 && (
+          <div className="px-4 md:px-8">
+            <div
+              className="flex gap-2 overflow-x-auto hide-scrollbar py-1"
+              role="tablist"
+              aria-label="Genres"
+            >
+              {genres.map((g) => (
+                <button
+                  key={g}
+                  role="tab"
+                  aria-selected={activeGenre === g}
+                  onClick={() => (activeGenre === g ? setActiveGenre(null) : selectGenre(g))}
+                  className={`px-4 py-2 rounded-full text-xs font-bold capitalize whitespace-nowrap border transition-all duration-200 cursor-pointer ${
+                    activeGenre === g
+                      ? 'bg-brand-500 border-brand-400 text-white shadow-glow'
+                      : 'bg-ink-800/80 border-ink-700 text-slate-300 hover:border-brand-500/40 hover:text-white'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
             </div>
-        </div>
-    );
-};
+          </div>
+        )}
 
-export default EnglishPortal;
+        {/* Active genre results */}
+        {activeGenre && (
+          <section aria-label={`${activeGenre} ${type}`}>
+            <SectionHeader
+              title={`${activeGenre.charAt(0).toUpperCase() + activeGenre.slice(1)} ${isSeries ? 'Series' : 'Movies'}`}
+              subtitle={loadingGenre && genreResults.length === 0 ? 'Fetching…' : undefined}
+            />
+            {genreResults.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 px-4 md:px-8">
+                  {genreResults.map((m, i) => (
+                    <PosterCard key={m.id || i} item={m} type={type} fluid />
+                  ))}
+                </div>
+                {genreHasMore && (
+                  <div className="flex justify-center mt-8">
+                    <Button
+                      variant="secondary"
+                      onClick={() => selectGenre(activeGenre, true)}
+                      disabled={loadingGenre}
+                    >
+                      {loadingGenre ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <ChevronDown size={16} />
+                      )}
+                      Load more
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : loadingGenre ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 px-4 md:px-8">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[2/3]" />
+                ))}
+              </div>
+            ) : null}
+          </section>
+        )}
+
+        {/* Popular shelf */}
+        <section aria-label={`Popular ${type}`}>
+          <SectionHeader title={`Popular ${isSeries ? 'Series' : 'Movies'}`} />
+          <MovieCarousel movies={popular.slice(0, 16)} type={type} loading={loading} size="lg" />
+        </section>
+
+        {/* Top rated shelf */}
+        <section aria-label={`Top rated ${type}`}>
+          <SectionHeader title={`Top Rated ${isSeries ? 'Series' : 'Movies'}`} />
+          <MovieCarousel movies={top.slice(0, 16)} type={type} loading={loading} />
+        </section>
+
+        {/* Deep list: everything else from popular */}
+        {popular.length > 16 && (
+          <section aria-label={`All ${type}`}>
+            <SectionHeader title={`More ${isSeries ? 'Series' : 'Movies'}`} />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-4 px-4 md:px-8">
+              {popular.slice(16).map((m, i) => (
+                <PosterCard key={m.id || i} item={m} type={type} fluid />
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
