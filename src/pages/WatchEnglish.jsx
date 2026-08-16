@@ -14,6 +14,7 @@ import { getDetails } from '../api/englishApi';
 import { useApp } from '../context/AppContext';
 import { usePageMeta } from '../hooks';
 import { cleanTitle } from '../lib/format';
+import { installPopupGuard } from '../lib/popupGuard';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { PageLoader } from '../components/ui/Skeleton';
@@ -39,6 +40,9 @@ export default function WatchEnglish() {
   const [selectedEpisode, setSelectedEpisode] = useState(null);
 
   usePageMeta(details ? `${cleanTitle(details.title)} — Streamda` : 'Watching — Streamda');
+
+  // Pop-up defence while a player is mounted.
+  useEffect(() => installPopupGuard(), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -102,9 +106,26 @@ export default function WatchEnglish() {
 
   const currentStreams = useMemo(() => {
     if (!details) return [];
-    if (type === 'movies') return details.streams || [];
-    return selectedEpisode?.streams || [];
-  }, [details, type, selectedEpisode]);
+    const backendStreams =
+      type === 'movies' ? details.streams || [] : selectedEpisode?.streams || [];
+
+    // Front-load a verified ad-light provider (clean Next.js player, no
+    // pop-under networks detected) so it's the default pick.
+    // Movies only: vidlink's TV routes need TMDB ids, and our backend
+    // speaks IMDB — series fall back to the backend's server list.
+    const imdbId = details.id || id;
+    const merged =
+      type === 'movies'
+        ? [{ name: 'VidLink ✦', url: `https://vidlink.pro/movie/${imdbId}` }, ...backendStreams]
+        : backendStreams;
+    // De-dupe by URL in case the backend adds the same provider later.
+    const seen = new Set();
+    return merged.filter((s) => {
+      if (seen.has(s.url)) return false;
+      seen.add(s.url);
+      return true;
+    });
+  }, [details, type, selectedEpisode, id]);
 
   const currentStream = currentStreams[Math.min(serverIndex, currentStreams.length - 1)];
 
@@ -215,7 +236,11 @@ export default function WatchEnglish() {
                 allowFullScreen
                 allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                 referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+                // Deliberately NO `allow-popups`: this is what physically
+                // prevents provider ad scripts from opening pop-unders.
+                // Playback-critical permissions (scripts/same-origin/forms)
+                // stay granted so players keep working.
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
               />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500">
@@ -369,8 +394,8 @@ export default function WatchEnglish() {
             <div className="bg-ink-900/70 border border-ink-700/60 rounded-2xl p-6 text-center lg:sticky lg:top-6">
               <h3 className="text-base font-bold text-white mb-2">Tips</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                If a server buffers or shows ads, switch to another one below the player. Streams
-                open in a sandboxed frame for your safety.
+                The player frame blocks pop-ups at the browser level. If a server still shows
+                overlay ads or buffers, switch to another one — VidLink ✦ is usually the cleanest.
               </p>
               <Link
                 to="/english"
