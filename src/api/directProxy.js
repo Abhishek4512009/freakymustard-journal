@@ -36,3 +36,24 @@ export function resolveDirect({ type, imdbId, season, episode }, signal) {
       : `/resolve/tv/${encodeURIComponent(imdbId)}/${season}/${episode}`;
   return fetchJson(`${PROXY_BASE}${path}`, { signal, cache: true });
 }
+
+/**
+ * Build a single-file download URL for a Direct source.
+ *
+ * The proxy's /download endpoint takes the same signed token as /hls, picks
+ * the best variant server-side and streams one MPEG-TS attachment, so the
+ * browser saves it natively instead of buffering a movie-sized blob.
+ *
+ * @param {string} sourceUrl  a Direct source url (`…/hls/{token}`)
+ * @param {string} [filename] download name (server sanitizes + adds .ts)
+ * @returns {string|null} null when the url isn't a proxy /hls link
+ */
+export function buildDownloadUrl(sourceUrl, filename = 'video') {
+  const match = /^(.*\/)hls\/([^/?#]+)/.exec(sourceUrl || '');
+  if (!match) return null;
+  const clean = filename
+    .replace(/[^A-Za-z0-9._() -]/g, '')
+    .trim()
+    .slice(0, 120);
+  return `${match[1]}download/${match[2]}?filename=${encodeURIComponent(clean || 'video')}`;
+}

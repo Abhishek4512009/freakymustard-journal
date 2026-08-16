@@ -11,9 +11,10 @@ import {
   ExternalLink,
   Zap,
   Loader2,
+  Download,
 } from 'lucide-react';
 import { getDetails } from '../api/englishApi';
-import { resolveDirect } from '../api/directProxy';
+import { resolveDirect, buildDownloadUrl } from '../api/directProxy';
 import { useApp } from '../context/AppContext';
 import { usePageMeta } from '../hooks';
 import { cleanTitle } from '../lib/format';
@@ -68,7 +69,9 @@ export default function WatchEnglish() {
   // already playing — they can still pick Direct manually.
   const [directIsDefault, setDirectIsDefault] = useState(false);
 
-  usePageMeta(details ? `${cleanTitle(details.title)} — FreakyMustard` : 'Watching — FreakyMustard');
+  usePageMeta(
+    details ? `${cleanTitle(details.title)} — FreakyMustard` : 'Watching — FreakyMustard'
+  );
 
   // Pop-up defence while a player is mounted.
   useEffect(() => installPopupGuard(), []);
@@ -255,6 +258,21 @@ export default function WatchEnglish() {
     servers[0] ||
     null;
 
+  // Download via the FreakyMustard proxy. Only Direct sources are
+  // downloadable (embed iframes can't be). Uses the active Direct source,
+  // falling back to the first one — so the button works even while an embed
+  // server is playing.
+  const downloadUrl = useMemo(() => {
+    const direct =
+      activeServer?.kind === 'direct' ? activeServer : servers.find((s) => s.kind === 'direct');
+    if (!direct || !details) return null;
+    const epSuffix =
+      type === 'series' && selectedEpisode
+        ? ` S${selectedEpisode.season}E${selectedEpisode.episode}`
+        : '';
+    return buildDownloadUrl(direct.url, `${cleanTitle(details.title)}${epSuffix}`);
+  }, [activeServer, servers, type, selectedEpisode, details]);
+
   const selectEpisode = (ep) => {
     setSelectedEpisode(ep);
     setServerKey(null);
@@ -278,6 +296,10 @@ export default function WatchEnglish() {
     } catch {
       showToast('Could not copy the link', 'error');
     }
+  };
+
+  const handleDownloadStart = () => {
+    showToast('Download started — the FreakyMustard server is assembling the video.', 'success');
   };
 
   // Real progress reporting for the direct player (unlike embeds, we can
@@ -365,6 +387,20 @@ export default function WatchEnglish() {
           <Button variant="secondary" size="sm" onClick={handleShare}>
             <Share2 size={14} /> <span className="hidden sm:inline">Share</span>
           </Button>
+          {downloadUrl && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                // The proxy answers with an attachment, so this never leaves
+                // a visible tab behind — the browser just saves the file.
+                window.open(downloadUrl, '_blank', 'noopener');
+                handleDownloadStart();
+              }}
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Download</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -381,6 +417,8 @@ export default function WatchEnglish() {
                 title={`${title} — FreakyMustard Direct`}
                 initialTime={resumePosition}
                 onProgress={handleDirectProgress}
+                downloadUrl={downloadUrl}
+                onDownload={handleDownloadStart}
               />
             ) : activeServer ? (
               <iframe

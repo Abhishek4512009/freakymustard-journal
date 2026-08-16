@@ -12,6 +12,7 @@ import {
   PictureInPicture2,
   Loader2,
   SkipForward,
+  Download,
 } from 'lucide-react';
 import { formatTime, clamp } from '../lib/format';
 
@@ -27,6 +28,10 @@ const CONTROLS_HIDE_MS = 2800;
  *  - title: used for aria labels
  *  - initialTime: seconds to resume from
  *  - onProgress(seconds, duration): throttled progress reporting
+ *  - downloadUrl: when set, shows a Download button pointing at the
+ *      proxy's single-file /download endpoint (Content-Disposition attachment)
+ *  - onDownload: optional callback fired when a download is kicked off
+ *      (e.g. to toast "download started")
  *
  * All handler state flows through refs so keyboard/gesture listeners never
  * suffer stale closures (a bug class in the v1 player).
@@ -38,6 +43,8 @@ export default function VideoPlayer({
   initialTime = 0,
   onProgress,
   hls = false,
+  downloadUrl,
+  onDownload,
 }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
@@ -120,9 +127,11 @@ export default function VideoPlayer({
       setPlaybackError(true);
     };
 
-    import('hls.js').then((mod) => attach(mod.default || mod)).catch(() => {
-      if (!destroyed) setPlaybackError(true);
-    });
+    import('hls.js')
+      .then((mod) => attach(mod.default || mod))
+      .catch(() => {
+        if (!destroyed) setPlaybackError(true);
+      });
 
     return () => {
       destroyed = true;
@@ -233,6 +242,23 @@ export default function VideoPlayer({
       /* unsupported */
     }
   }, []);
+
+  /* ---------------- download ---------------- */
+
+  // The proxy answers with Content-Disposition: attachment, so a plain anchor
+  // click is all it takes — the browser streams the file to disk natively.
+  const triggerDownload = useCallback(() => {
+    if (!downloadUrl) return;
+    showControls();
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    onDownload?.();
+  }, [downloadUrl, onDownload, showControls]);
 
   /* ---------------- speed ---------------- */
 
@@ -543,6 +569,17 @@ export default function VideoPlayer({
               </div>
             )}
           </div>
+
+          {downloadUrl && (
+            <button
+              onClick={triggerDownload}
+              aria-label="Download video"
+              title="Download (assembled by the FreakyMustard server)"
+              className="p-2 text-white/80 hover:text-white transition-colors cursor-pointer"
+            >
+              <Download size={18} />
+            </button>
+          )}
 
           {document.pictureInPictureEnabled && (
             <button
