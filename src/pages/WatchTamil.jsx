@@ -34,7 +34,7 @@ export default function WatchTamil() {
   const watchLink = `/watch/tamil/${itemId}?title=${encodeURIComponent(rawTitle)}`;
   const title = cleanTitle(rawTitle);
 
-  usePageMeta(`${title} — Streamda`);
+  usePageMeta(`${title} — FreakyMustard`);
 
   // Resume position from Continue Watching (seconds, if we stored them).
   const [resumeAt, setResumeAt] = useState(0);

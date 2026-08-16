@@ -16,7 +16,7 @@ const FILTERS = [
 
 /** Dedicated watchlist manager. */
 export default function Watchlist() {
-  usePageMeta('Watchlist — Streamda', 'Everything you saved to watch later.');
+  usePageMeta('Watchlist — FreakyMustard', 'Everything you saved to watch later.');
   const { watchlist, removeFromWatchlist, showToast } = useApp();
   const [filter, setFilter] = useState('all');
 

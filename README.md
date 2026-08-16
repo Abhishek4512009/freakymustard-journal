@@ -1,12 +1,13 @@
-# Streamda 🎬
+# FreakyMustard 🎬
 
 A fast, beautiful streaming portal for **English movies & series** and **Tamil cinema** — built with React 19, Vite 8 and Tailwind CSS v4.
 
-![Streamda](public/og-cover.png)
+![FreakyMustard](public/og-cover.png)
 
 ## Features
 
 - **Two portals, one app** — Hollywood (IMDB-backed metadata, multiple stream servers) and Tamil cinema (year-wise catalogue, direct quality-resolved streams).
+- **FreakyMustard ✦ Direct** — our own ad-free HLS player (hls.js) fed by a self-hosted resolution proxy; real progress tracking + resume, with third-party embed servers kept as fallback.
 - **Cinematic hero** — auto-rotating featured slides with crossfading backdrops.
 - **Unified search** — debounced live search across English movies, series and Tamil movies with recent & trending suggestions.
 - **Custom video player** — for Tamil direct streams: gestures (double-tap seek), keyboard shortcuts, speed control, PiP, fullscreen, buffering states, skip-intro.
@@ -76,7 +77,7 @@ Static build — deploy `dist/` anywhere (Netlify, Vercel, Cloudflare Pages, Git
 
 ## Notes
 
-- Stream sources are third-party embeds; the app sandboxes iframes (`sandbox="allow-scripts allow-same-origin allow-forms allow-popups"`) and never injects credentials.
+- Stream sources are third-party embeds (iframes are NOT sandboxed — providers reject sandboxed embeds); the app defends against pop-ups/redirects with a popup guard and `noreferrer`. The preferred source is FreakyMustard ✦ Direct, which bypasses embeds entirely.
 - Watchlist/progress live in `localStorage` only — no accounts, no tracking.
 
 ## License

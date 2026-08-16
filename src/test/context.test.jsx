@@ -74,7 +74,7 @@ describe('AppContext', () => {
     await user.click(screen.getByText('progress-null'));
     expect(screen.getByTestId('cw-count')).toHaveTextContent('1');
     // progress should still be 40 in storage
-    const stored = JSON.parse(localStorage.getItem('streamda:v2:continue'));
+    const stored = JSON.parse(localStorage.getItem('freakymustard:v2:continue'));
     expect(stored[0].progress).toBe(40);
   });
 
@@ -83,7 +83,7 @@ describe('AppContext', () => {
     setup();
     await user.click(screen.getByText('add'));
     await waitFor(() => {
-      expect(localStorage.getItem('streamda:v2:watchlist')).toContain('tt1');
+      expect(localStorage.getItem('freakymustard:v2:watchlist')).toContain('tt1');
     });
   });
 

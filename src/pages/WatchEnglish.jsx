@@ -13,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getDetails } from '../api/englishApi';
-import { resolveDirect } from '../api/streamdaProxy';
+import { resolveDirect } from '../api/directProxy';
 import { useApp } from '../context/AppContext';
 import { usePageMeta } from '../hooks';
 import { cleanTitle } from '../lib/format';
@@ -28,7 +28,7 @@ import { ErrorState, EmptyState } from '../components/ui/States';
  * English watch page (movie or series).
  *
  * Playback sources, in priority order:
- *  1. Streamda ✦ Direct — our own ad-free HLS proxy (hls.js player, real
+ *  1. FreakyMustard ✦ Direct — our own ad-free HLS proxy (hls.js player, real
  *     progress tracking + resume). Resolved asynchronously; if it's slow or
  *     fails, embed servers keep working exactly as before.
  *  2. Third-party embed servers (VidLink, backend providers) — unchanged.
@@ -59,7 +59,7 @@ export default function WatchEnglish() {
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
 
-  // Streamda Direct (our own HLS proxy) resolution state.
+  // FreakyMustard Direct (our own HLS proxy) resolution state.
   const [directSources, setDirectSources] = useState([]);
   const [directLoading, setDirectLoading] = useState(false);
   const [directError, setDirectError] = useState(null);
@@ -68,7 +68,7 @@ export default function WatchEnglish() {
   // already playing — they can still pick Direct manually.
   const [directIsDefault, setDirectIsDefault] = useState(false);
 
-  usePageMeta(details ? `${cleanTitle(details.title)} — Streamda` : 'Watching — Streamda');
+  usePageMeta(details ? `${cleanTitle(details.title)} — FreakyMustard` : 'Watching — FreakyMustard');
 
   // Pop-up defence while a player is mounted.
   useEffect(() => installPopupGuard(), []);
@@ -115,7 +115,7 @@ export default function WatchEnglish() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, id]);
 
-  // Resolve Streamda Direct HLS sources whenever the title/episode changes.
+  // Resolve FreakyMustard Direct HLS sources whenever the title/episode changes.
   // Runs independently of the embed server list; failures degrade gracefully
   // to the normal providers (directError is surfaced in the Direct panel).
   useEffect(() => {
@@ -203,7 +203,7 @@ export default function WatchEnglish() {
   );
 
   /**
-   * Unified server list: Streamda Direct (our ad-free HLS proxy) first,
+   * Unified server list: FreakyMustard Direct (our ad-free HLS proxy) first,
    * then every existing embed provider — nothing is removed.
    *
    * Each entry carries a stable `key` ("direct:0", "embed:1", …) so the
@@ -234,7 +234,7 @@ export default function WatchEnglish() {
     const direct = directSources.map((s, i) => ({
       key: `direct:${i}`,
       kind: 'direct',
-      name: directSources.length > 1 ? `Streamda ✦ ${i + 1}` : 'Streamda ✦ Direct',
+      name: directSources.length > 1 ? `FreakyMustard ✦ ${i + 1}` : 'FreakyMustard ✦ Direct',
       url: s.url,
     }));
     const embedServers = dedupedEmbeds.map((s, i) => ({
@@ -378,7 +378,7 @@ export default function WatchEnglish() {
                 hls
                 src={activeServer.url}
                 poster={details.backdrop || details.poster}
-                title={`${title} — Streamda Direct`}
+                title={`${title} — FreakyMustard Direct`}
                 initialTime={resumePosition}
                 onProgress={handleDirectProgress}
               />
@@ -450,12 +450,12 @@ export default function WatchEnglish() {
           {directLoading && (
             <p className="flex items-center gap-2 text-[11px] text-slate-500">
               <Loader2 size={12} className="animate-spin text-brand-400" />
-              Resolving ad-free Streamda Direct stream…
+              Resolving ad-free FreakyMustard Direct stream…
             </p>
           )}
           {!directLoading && directError && servers.some((s) => s.kind === 'embed') && (
             <p className="text-[11px] text-slate-500">
-              Streamda Direct unavailable ({directError}) — using an embed server instead.
+              FreakyMustard Direct unavailable ({directError}) — using an embed server instead.
             </p>
           )}
 
@@ -572,7 +572,7 @@ export default function WatchEnglish() {
             <div className="bg-ink-900/70 border border-ink-700/60 rounded-2xl p-6 text-center lg:sticky lg:top-6">
               <h3 className="text-base font-bold text-white mb-2">Tips</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                <span className="text-brand-300 font-bold">Streamda ✦ Direct</span> is our own
+                <span className="text-brand-300 font-bold">FreakyMustard ✦ Direct</span> is our own
                 ad-free player — no pop-ups, no overlays, and it remembers your position. If it's
                 unavailable for a title, pick an embed server instead; pop-ups from those are
                 blocked automatically.

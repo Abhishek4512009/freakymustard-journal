@@ -1,5 +1,5 @@
 /**
- * Streamda HTTP layer.
+ * FreakyMustard HTTP layer.
  *
  * Production concerns handled here:
  *  - Render free-tier cold starts can take 30-50s: generous first-attempt

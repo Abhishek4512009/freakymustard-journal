@@ -3,7 +3,11 @@
  * Never throws (private mode / quota / SSR) and namespaces all keys.
  */
 
-const NS = 'streamda:v2:';
+const NS = 'freakymustard:v2:';
+
+// Previous namespace (the app was branded "Streamda" before). Kept so we can
+// migrate existing users' data forward without losing watchlists/progress.
+const LEGACY_NS = 'streamda:v2:';
 
 export const storage = {
   get(key, fallback = null) {
@@ -34,8 +38,10 @@ export const storage = {
 };
 
 /**
- * Migrate v1 keys (streamda_watchlist / streamda_continue) into v2
- * so existing users keep their data after the overhaul.
+ * Migrate legacy keys into the current namespace so existing users keep
+ * their data across rebrands/overhauls:
+ *  - v1 keys: streamda_watchlist / streamda_continue (pre-v2 overhaul)
+ *  - old v2 namespace: streamda:v2:* -> freakymustard:v2:* (rebrand)
  */
 export function migrateV1() {
   try {
@@ -48,6 +54,25 @@ export function migrateV1() {
     if (legacyCont && !localStorage.getItem(NS + 'continue')) {
       storage.set('continue', JSON.parse(legacyCont));
       localStorage.removeItem('streamda_continue');
+    }
+  } catch {
+    /* best effort */
+  }
+
+  // Rebrand migration: copy every streamda:v2:* key into the new namespace
+  // (only if the new key doesn't exist yet), then drop the old keys.
+  try {
+    const toMigrate = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(LEGACY_NS)) toMigrate.push(k);
+    }
+    for (const k of toMigrate) {
+      const newKey = NS + k.slice(LEGACY_NS.length);
+      if (localStorage.getItem(newKey) === null) {
+        localStorage.setItem(newKey, localStorage.getItem(k));
+      }
+      localStorage.removeItem(k);
     }
   } catch {
     /* best effort */

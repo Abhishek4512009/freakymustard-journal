@@ -1,9 +1,9 @@
 {
-  "name": "streamda",
+  "name": "freakymustard",
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "Streamda — a fast, beautiful streaming portal for English movies & series and Tamil movies.",
+  "description": "FreakyMustard — a fast, beautiful streaming portal for English movies & series and Tamil movies.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

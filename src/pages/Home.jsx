@@ -17,7 +17,7 @@ import { getYears, getMovies } from '../api/tamilApi';
  */
 export default function Home() {
   usePageMeta(
-    'Streamda — Watch English & Tamil Movies Online',
+    'FreakyMustard — Watch English & Tamil Movies Online',
     'Stream the latest English movies, series and Tamil cinema. Fast, beautiful, ad-light.'
   );
 

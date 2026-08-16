@@ -1,7 +1,7 @@
 import { fetchJson } from '../lib/http';
 
 /**
- * Streamda Direct — our own ad-free HLS resolution proxy.
+ * FreakyMustard Direct — our own ad-free HLS resolution proxy.
  *
  * The proxy (a FastAPI service on Hugging Face Spaces) resolves clean HLS
  * streams from the VidSrc API and relays every byte through a signed,
@@ -9,10 +9,13 @@ import { fetchJson } from '../lib/http';
  * page, and the CDN's Cloudflare WAF (which 403s any request carrying an
  * Origin/Referer header) is satisfied because the proxy sends neither.
  *
- * Override the base with VITE_STREAMDA_PROXY if you self-host the proxy.
+ * Override the base with VITE_DIRECT_PROXY if you self-host the proxy
+ * (VITE_STREAMDA_PROXY is still honoured for backward compatibility).
  */
 const PROXY_BASE = (
-  import.meta.env.VITE_STREAMDA_PROXY || 'https://freakymustard67-potato.hf.space'
+  import.meta.env.VITE_DIRECT_PROXY ||
+  import.meta.env.VITE_STREAMDA_PROXY ||
+  'https://freakymustard67-potato.hf.space'
 ).replace(/\/$/, '');
 
 /**

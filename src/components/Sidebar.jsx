@@ -24,7 +24,7 @@ function Logo({ expanded }) {
       <span
         className={`text-lg font-black tracking-wide font-display whitespace-nowrap transition-all duration-200 ${expanded ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2 w-0'}`}
       >
-        STREAM<span className="text-gradient-brand">DA</span>
+        FREAKY<span className="text-gradient-brand">MUSTARD</span>
       </span>
     </div>
   );

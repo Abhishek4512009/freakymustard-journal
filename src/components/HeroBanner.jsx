@@ -36,7 +36,7 @@ export default function HeroBanner({ movies = [], type = 'movies' }) {
       <div className="relative h-[55vh] md:h-[78vh] w-full bg-gradient-to-b from-ink-900 to-ink-950 flex items-center justify-center">
         <div className="text-center px-6">
           <h1 className="text-3xl md:text-5xl font-black font-display text-gradient-brand mb-3">
-            STREAMDA
+            FREAKYMUSTARD
           </h1>
           <p className="text-slate-400 text-sm md:text-base max-w-md mx-auto">
             English blockbusters, binge-worthy series and the latest Tamil cinema — all in one

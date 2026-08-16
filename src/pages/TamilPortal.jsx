@@ -17,7 +17,7 @@ import { Loader2, ChevronDown } from 'lucide-react';
  */
 export default function TamilPortal() {
   usePageMeta(
-    'Tamil Movies — Streamda',
+    'Tamil Movies — FreakyMustard',
     'Watch the latest Tamil movies by year — 2026 back to classics.'
   );
 

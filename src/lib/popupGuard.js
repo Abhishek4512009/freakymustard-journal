@@ -31,7 +31,7 @@ export function installPopupGuard() {
     try {
       const host = url ? new URL(url, window.location.href).host : '';
       if (!TRUSTED_HOSTS.has(host)) {
-        console.info('[streamda] blocked pop-up:', url);
+        console.info('[freakymustard] blocked pop-up:', url);
         return null;
       }
     } catch {
@@ -51,7 +51,7 @@ export function installPopupGuard() {
       if (!TRUSTED_HOSTS.has(host)) {
         e.preventDefault();
         e.stopPropagation();
-        console.info('[streamda] blocked new-tab navigation:', anchor.href);
+        console.info('[freakymustard] blocked new-tab navigation:', anchor.href);
       }
     } catch {
       /* ignore */

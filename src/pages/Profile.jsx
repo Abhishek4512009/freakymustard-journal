@@ -11,7 +11,7 @@ import Badge from '../components/ui/Badge';
  * My Space: profile switcher, honest stats, continue watching + watchlist.
  */
 export default function Profile() {
-  usePageMeta('My Space — Streamda', 'Manage profiles, watchlist and continue watching.');
+  usePageMeta('My Space — FreakyMustard', 'Manage profiles, watchlist and continue watching.');
 
   const { profiles, activeProfile, switchProfile, watchlist, continueWatching, showToast } =
     useApp();
@@ -186,7 +186,7 @@ export default function Profile() {
             LOCAL
           </Badge>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Streamda stores everything in your browser (localStorage) — no account, no tracking.
+            FreakyMustard stores everything in your browser (localStorage) — no account, no tracking.
             Clearing site data will reset your watchlist and history.
           </p>
         </div>

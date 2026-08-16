@@ -16,7 +16,7 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('Streamda crashed:', error, info);
+    console.error('FreakyMustard crashed:', error, info);
   }
 
   render() {

@@ -26,7 +26,7 @@ const TRENDING_SUGGESTIONS = [
  * Debounced live search + URL sync (?q=) + recent searches.
  */
 export default function SearchPage() {
-  usePageMeta('Search — Streamda', 'Search English movies, series and Tamil movies.');
+  usePageMeta('Search — FreakyMustard', 'Search English movies, series and Tamil movies.');
 
   const [searchParams, setSearchParams] = useSearchParams();
   const { recentSearches, addRecentSearch, clearRecentSearches } = useApp();

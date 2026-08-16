@@ -1,4 +1,4 @@
-/* Streamda service worker — app-shell caching for instant repeat loads.
+/* FreakyMustard service worker — app-shell caching for instant repeat loads.
  * Strategy:
  *  - Precache the shell on install.
  *  - Navigations: network-first, falling back to cached shell (offline page).
@@ -6,7 +6,7 @@
  *  - API calls: never cached here (the app has its own TTL cache).
  */
 
-const VERSION = 'streamda-v2-1';
+const VERSION = 'freakymustard-v2-1';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 

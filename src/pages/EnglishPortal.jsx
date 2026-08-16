@@ -17,7 +17,7 @@ import { Loader2, ChevronDown } from 'lucide-react';
 export default function EnglishPortal({ type = 'movies' }) {
   const isSeries = type === 'series';
   usePageMeta(
-    `English ${isSeries ? 'Series' : 'Movies'} — Streamda`,
+    `English ${isSeries ? 'Series' : 'Movies'} — FreakyMustard`,
     `Browse popular and top-rated English ${isSeries ? 'series' : 'movies'} by genre.`
   );
 
