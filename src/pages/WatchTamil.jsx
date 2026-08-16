@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Share2, Film, BadgeCheck } from 'lucide-react';
+import { ArrowLeft, Share2, Film, BadgeCheck, Download } from 'lucide-react';
 import { getAutoStream } from '../api/tamilApi';
 import { useApp } from '../context/AppContext';
 import { usePageMeta } from '../hooks';
 import { cleanTitle } from '../lib/format';
+import { triggerDownload } from '../lib/download';
 import VideoPlayer from '../components/VideoPlayer';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -24,6 +25,7 @@ export default function WatchTamil() {
   const { saveProgress, showToast, continueWatching } = useApp();
 
   const [streamUrl, setStreamUrl] = useState(null);
+  const [downloadUrl, setDownloadUrl] = useState(null);
   const [quality, setQuality] = useState('');
   const [poster, setPoster] = useState(null);
   const [desc, setDesc] = useState('');
@@ -59,6 +61,8 @@ export default function WatchTamil() {
         const result = await getAutoStream(link, controller.signal);
         if (!result?.stream_url) throw new Error('No stream could be resolved for this movie.');
         setStreamUrl(result.stream_url);
+        // Signed relay link served by our backend (resumable attachment).
+        setDownloadUrl(result.download_url || null);
         setQuality(result.quality || '');
         setPoster(result.poster || null);
         setDesc(result.desc || '');
@@ -112,6 +116,10 @@ export default function WatchTamil() {
     }
   };
 
+  const handleDownloadStart = () => {
+    showToast('Download started — the FreakyMustard server is fetching the video.', 'success');
+  };
+
   return (
     <div className="min-h-screen bg-ink-950 flex flex-col">
       {/* Header */}
@@ -138,9 +146,29 @@ export default function WatchTamil() {
             </div>
           </div>
         </div>
-        <Button variant="secondary" size="sm" onClick={handleShare}>
-          <Share2 size={14} /> <span className="hidden sm:inline">Share</span>
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="secondary" size="sm" onClick={handleShare}>
+            <Share2 size={14} /> <span className="hidden sm:inline">Share</span>
+          </Button>
+          {downloadUrl && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                triggerDownload(downloadUrl, {
+                  onStarted: handleDownloadStart,
+                  onError: () =>
+                    showToast(
+                      'Download failed — the stream link may have expired. Reload the page and try again.',
+                      'error'
+                    ),
+                })
+              }
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Download</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Player */}
@@ -175,6 +203,8 @@ export default function WatchTamil() {
               title={title}
               initialTime={resumeAt}
               onProgress={handleProgress}
+              downloadUrl={downloadUrl}
+              onDownload={handleDownloadStart}
             />
           ) : null}
         </div>
