@@ -15,6 +15,7 @@ const EnglishPortal = lazy(() => import('./pages/EnglishPortal'));
 const TamilPortal = lazy(() => import('./pages/TamilPortal'));
 const WatchEnglish = lazy(() => import('./pages/WatchEnglish'));
 const WatchTamil = lazy(() => import('./pages/WatchTamil'));
+const WatchTamilSeries = lazy(() => import('./pages/WatchTamilSeries'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 /** Reset scroll on navigation. */
@@ -42,6 +43,7 @@ function Shell() {
             <Route path="/tamil" element={<TamilPortal />} />
             <Route path="/watch/english/:type/:id" element={<WatchEnglish />} />
             <Route path="/watch/tamil/:encodedUrl" element={<WatchTamil />} />
+            <Route path="/watch/tamil-series/:encodedUrl" element={<WatchTamilSeries />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

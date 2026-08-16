@@ -7,7 +7,7 @@ import Button from '../components/ui/Button';
 import { ErrorState } from '../components/ui/States';
 import { Skeleton } from '../components/ui/Skeleton';
 import { usePageMeta } from '../hooks';
-import { getYears, getMovies } from '../api/tamilApi';
+import { getYears, getMovies, getSeries } from '../api/tamilApi';
 import { Loader2, ChevronDown } from 'lucide-react';
 
 /**
@@ -23,6 +23,9 @@ export default function TamilPortal() {
 
   const [years, setYears] = useState([]);
   const [rows, setRows] = useState([]); // [{ name, movies }]
+  const [seriesList, setSeriesList] = useState([]); // Tamil web series shelf
+  const [seriesPages, setSeriesPages] = useState(1);
+  const [loadingSeries, setLoadingSeries] = useState(false);
   const [activeYear, setActiveYear] = useState(null); // { name, link }
   const [yearMovies, setYearMovies] = useState([]);
   const [yearPages, setYearPages] = useState(1);
@@ -55,6 +58,15 @@ export default function TamilPortal() {
           )
           .filter(Boolean);
         setRows(built);
+
+        // Web series shelf — non-fatal if it fails.
+        try {
+          const series = await getSeries(1, signal);
+          if (series?.results?.length) setSeriesList(series.results);
+        } catch {
+          /* shelf simply stays hidden */
+        }
+
         setPhase('ready');
       } catch (err) {
         if (!signal.aborted) {
@@ -167,6 +179,51 @@ export default function TamilPortal() {
                 ))}
               </div>
             ) : null}
+          </section>
+        )}
+
+        {/* Web series shelf */}
+        {seriesList.length > 0 && (
+          <section aria-label="Tamil web series">
+            <SectionHeader title="Web Series" subtitle="Tamil series, episode by episode" />
+            <div className="relative">
+              <MovieCarousel
+                movies={seriesList.map((s) => ({ ...s, kind: 'series' }))}
+                type="tamil-series"
+              />
+              <div className="flex justify-center mt-6">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    setLoadingSeries(true);
+                    try {
+                      const next = await getSeries(seriesPages + 1);
+                      if (next?.results?.length) {
+                        const seen = new Set(seriesList.map((s) => s.link));
+                        setSeriesList((prev) => [
+                          ...prev,
+                          ...next.results.filter((s) => !seen.has(s.link)),
+                        ]);
+                        setSeriesPages(seriesPages + 1);
+                      }
+                    } catch {
+                      /* keep current shelf */
+                    } finally {
+                      setLoadingSeries(false);
+                    }
+                  }}
+                  disabled={loadingSeries}
+                >
+                  {loadingSeries ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <ChevronDown size={14} />
+                  )}
+                  More series
+                </Button>
+              </div>
+            </div>
           </section>
         )}
 

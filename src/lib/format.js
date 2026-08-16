@@ -45,7 +45,9 @@ export function isTamilNavigationItem(item) {
 /** Build the internal watch route for any content item. */
 export function watchLinkFor(item, type = 'movies') {
   if (item?.link) {
-    return `/watch/tamil/${encodeURIComponent(item.link)}?title=${encodeURIComponent(item.title || '')}`;
+    const base =
+      item.kind === 'series' || type === 'tamil-series' ? '/watch/tamil-series' : '/watch/tamil';
+    return `${base}/${encodeURIComponent(item.link)}?title=${encodeURIComponent(item.title || '')}`;
   }
   return `/watch/english/${type}/${item?.id}`;
 }

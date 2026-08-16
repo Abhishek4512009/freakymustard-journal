@@ -33,3 +33,20 @@ export const searchMovies = async (query, signal) => {
   const data = await fetchJson(`${API_BASE}/search?q=${encodeURIComponent(query)}`, { signal });
   return Array.isArray(data) ? data.filter((m) => !isTamilNavigationItem(m)) : [];
 };
+
+/**
+ * Tamil web series: listing -> seasons -> episodes -> episode stream.
+ */
+export const getSeries = (page = 1, signal) =>
+  fetchJson(`${API_BASE}/series?page=${page}`, { signal });
+
+export const getSeasons = (seriesUrl, signal) =>
+  fetchJson(`${API_BASE}/seasons?series_url=${encodeURIComponent(seriesUrl)}`, { signal });
+
+export const getEpisodes = (seasonUrl, signal, pages = 10) =>
+  fetchJson(`${API_BASE}/episodes?season_url=${encodeURIComponent(seasonUrl)}&pages=${pages}`, {
+    signal,
+  });
+
+export const getEpisodeStream = (episodeUrl, signal) =>
+  fetchJson(`${API_BASE}/episode-stream?episode_url=${encodeURIComponent(episodeUrl)}`, { signal });
