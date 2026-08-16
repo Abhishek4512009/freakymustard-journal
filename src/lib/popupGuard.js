@@ -11,11 +11,7 @@
  *  - auto-closes any window that does slip through
  */
 
-const TRUSTED_HOSTS = new Set([
-  window.location.host,
-  'github.com',
-  'www.github.com',
-]);
+const TRUSTED_HOSTS = new Set([window.location.host, 'github.com', 'www.github.com']);
 
 let installed = false;
 

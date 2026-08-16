@@ -186,8 +186,8 @@ export default function Profile() {
             LOCAL
           </Badge>
           <p className="text-xs text-slate-500 leading-relaxed">
-            FreakyMustard stores everything in your browser (localStorage) — no account, no tracking.
-            Clearing site data will reset your watchlist and history.
+            FreakyMustard stores everything in your browser (localStorage) — no account, no
+            tracking. Clearing site data will reset your watchlist and history.
           </p>
         </div>
       </section>

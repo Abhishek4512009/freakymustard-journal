@@ -8,6 +8,7 @@ A fast, beautiful streaming portal for **English movies & series** and **Tamil c
 
 - **Two portals, one app** — Hollywood (IMDB-backed metadata, multiple stream servers) and Tamil cinema (year-wise catalogue, direct quality-resolved streams).
 - **FreakyMustard ✦ Direct** — our own ad-free HLS player (hls.js) fed by a self-hosted resolution proxy; real progress tracking + resume, with third-party embed servers kept as fallback.
+- **Downloads** — one click saves the Direct stream as a single MPEG-TS file, assembled server-side by the FreakyMustard proxy (no in-tab blob, native browser download).
 - **Cinematic hero** — auto-rotating featured slides with crossfading backdrops.
 - **Unified search** — debounced live search across English movies, series and Tamil movies with recent & trending suggestions.
 - **Custom video player** — for Tamil direct streams: gestures (double-tap seek), keyboard shortcuts, speed control, PiP, fullscreen, buffering states, skip-intro.
