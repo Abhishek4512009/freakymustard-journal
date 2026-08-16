@@ -236,11 +236,10 @@ export default function WatchEnglish() {
                 allowFullScreen
                 allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                 referrerPolicy="no-referrer"
-                // Deliberately NO `allow-popups`: this is what physically
-                // prevents provider ad scripts from opening pop-unders.
-                // Playback-critical permissions (scripts/same-origin/forms)
-                // stay granted so players keep working.
-                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
+                // NO sandbox attribute: every major provider (VidLink, VidSrc,
+                // VidAPI, AutoEmbed) fingerprints sandboxed frames and refuses
+                // to play inside them. Pop-up defence is handled by
+                // src/lib/popupGuard.js on the parent page instead.
               />
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500">
@@ -394,7 +393,7 @@ export default function WatchEnglish() {
             <div className="bg-ink-900/70 border border-ink-700/60 rounded-2xl p-6 text-center lg:sticky lg:top-6">
               <h3 className="text-base font-bold text-white mb-2">Tips</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                The player frame blocks pop-ups at the browser level. If a server still shows
+                Pop-ups opened by players are blocked automatically. If a server still shows
                 overlay ads or buffers, switch to another one — VidLink ✦ is usually the cleanest.
               </p>
               <Link
