@@ -31,13 +31,21 @@ const CONTROLS_HIDE_MS = 2800;
  * All handler state flows through refs so keyboard/gesture listeners never
  * suffer stale closures (a bug class in the v1 player).
  */
-export default function VideoPlayer({ src, poster, title = 'video', initialTime = 0, onProgress }) {
+export default function VideoPlayer({
+  src,
+  poster,
+  title = 'video',
+  initialTime = 0,
+  onProgress,
+  hls = false,
+}) {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const hideTimer = useRef(null);
   const clickTimer = useRef(null);
   const progressThrottle = useRef(0);
   const resumed = useRef(false);
+  const hlsRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -59,6 +67,75 @@ export default function VideoPlayer({ src, poster, title = 'video', initialTime 
   useEffect(() => {
     stateRef.current = { isPlaying, duration, isMuted, volume };
   }, [isPlaying, duration, isMuted, volume]);
+
+  /* ---------------- HLS attach/detach ---------------- */
+  // When `hls` is true we drive the <video> through hls.js instead of a raw
+  // `src` attribute (our proxy URLs don't end in .m3u8, so native detection
+  // can't be relied on). hls.js is imported dynamically so it's split into
+  // its own chunk and only downloaded when HLS playback is actually used —
+  // plain MP4 playback (e.g. Tamil movies) never pays for it.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!hls || !video || !src) return undefined;
+
+    let destroyed = false;
+    let instance = null;
+    let usedNative = false;
+
+    const attach = (Hls) => {
+      if (destroyed) return;
+
+      if (Hls.isSupported()) {
+        instance = new Hls({
+          // The proxy relays every byte; keep buffering conservative for the
+          // free-tier CPU it runs on.
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          enableWorker: true,
+        });
+        hlsRef.current = instance;
+        instance.loadSource(src);
+        instance.attachMedia(video);
+        instance.on(Hls.Events.ERROR, (_evt, data) => {
+          if (!data.fatal) return;
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            // Transient CDN hiccup — hls.js can recover in place.
+            instance.startLoad();
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            instance.recoverMediaError();
+          } else if (!destroyed) {
+            setPlaybackError(true);
+          }
+        });
+        return;
+      }
+
+      // Safari / native HLS: point the element at the playlist directly.
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        usedNative = true;
+        video.src = src;
+        return;
+      }
+
+      setPlaybackError(true);
+    };
+
+    import('hls.js').then((mod) => attach(mod.default || mod)).catch(() => {
+      if (!destroyed) setPlaybackError(true);
+    });
+
+    return () => {
+      destroyed = true;
+      if (instance) {
+        instance.destroy();
+        hlsRef.current = null;
+      } else if (usedNative && video) {
+        // Native-HLS path cleanup (only if we actually set a src).
+        video.removeAttribute('src');
+        video.load();
+      }
+    };
+  }, [hls, src]);
 
   /* ---------------- controls visibility ---------------- */
 
@@ -285,7 +362,7 @@ export default function VideoPlayer({ src, poster, title = 'video', initialTime 
     >
       <video
         ref={videoRef}
-        src={src}
+        src={hls ? undefined : src}
         poster={poster}
         aria-label={title}
         className="w-full h-full object-contain"

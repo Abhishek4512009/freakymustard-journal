@@ -9,35 +9,64 @@ import {
   Server,
   AlertTriangle,
   ExternalLink,
+  Zap,
+  Loader2,
 } from 'lucide-react';
 import { getDetails } from '../api/englishApi';
+import { resolveDirect } from '../api/streamdaProxy';
 import { useApp } from '../context/AppContext';
 import { usePageMeta } from '../hooks';
 import { cleanTitle } from '../lib/format';
 import { installPopupGuard } from '../lib/popupGuard';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import VideoPlayer from '../components/VideoPlayer';
 import { PageLoader } from '../components/ui/Skeleton';
 import { ErrorState, EmptyState } from '../components/ui/States';
 
 /**
  * English watch page (movie or series).
- * Streams via third-party embed servers; the user picks a server and we
- * remember the choice. Progress is recorded honestly (opened = started,
- * no fabricated percentages).
+ *
+ * Playback sources, in priority order:
+ *  1. Streamda ✦ Direct — our own ad-free HLS proxy (hls.js player, real
+ *     progress tracking + resume). Resolved asynchronously; if it's slow or
+ *     fails, embed servers keep working exactly as before.
+ *  2. Third-party embed servers (VidLink, backend providers) — unchanged.
+ *
+ * Progress is recorded honestly (opened = started for embeds; real measured
+ * position for Direct).
  */
 export default function WatchEnglish() {
   const { type, id } = useParams();
   const navigate = useNavigate();
-  const { saveProgress, addToWatchlist, removeFromWatchlist, isInWatchlist, showToast } = useApp();
+  const {
+    saveProgress,
+    addToWatchlist,
+    removeFromWatchlist,
+    isInWatchlist,
+    showToast,
+    continueWatching,
+  } = useApp();
 
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [serverIndex, setServerIndex] = useState(0);
+  // Key of the selected server in the unified list (e.g. "direct:0", "embed:1").
+  // Key-based (not index-based) so the selection survives the Direct sources
+  // loading in asynchronously at the front of the list.
+  const [serverKey, setServerKey] = useState(null);
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(null);
+
+  // Streamda Direct (our own HLS proxy) resolution state.
+  const [directSources, setDirectSources] = useState([]);
+  const [directLoading, setDirectLoading] = useState(false);
+  const [directError, setDirectError] = useState(null);
+  // True only when Direct resolved quickly enough to be a sensible default.
+  // A slow (cold-start) resolve won't yank the user off an embed that's
+  // already playing — they can still pick Direct manually.
+  const [directIsDefault, setDirectIsDefault] = useState(false);
 
   usePageMeta(details ? `${cleanTitle(details.title)} — Streamda` : 'Watching — Streamda');
 
@@ -86,6 +115,75 @@ export default function WatchEnglish() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, id]);
 
+  // Resolve Streamda Direct HLS sources whenever the title/episode changes.
+  // Runs independently of the embed server list; failures degrade gracefully
+  // to the normal providers (directError is surfaced in the Direct panel).
+  useEffect(() => {
+    if (!details) return undefined;
+    const controller = new AbortController();
+    const imdbId = details.id || id;
+    if (!imdbId) return undefined;
+
+    const isSeries = type === 'series';
+    if (isSeries && !selectedEpisode) return undefined;
+
+    // Reset the previous title/episode's result before fetching the new one.
+    // This synchronous reset is the standard data-fetching pattern; the rule
+    // only objects to render-coupled state, which this is not.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setDirectLoading(true);
+    setDirectError(null);
+    setDirectSources([]);
+    setDirectIsDefault(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    const startedAt = Date.now();
+    resolveDirect(
+      {
+        type,
+        imdbId,
+        season: isSeries ? selectedEpisode.season : undefined,
+        episode: isSeries ? selectedEpisode.episode : undefined,
+      },
+      controller.signal
+    )
+      .then((data) => {
+        const sources = data?.sources || [];
+        setDirectSources(sources);
+        // Only auto-default to Direct if it resolved fast enough that the
+        // user hasn't already settled into an embed (cold starts can take
+        // 30-50s; we don't want to yank a playing video).
+        if (sources.length > 0 && Date.now() - startedAt < 4000) {
+          setDirectIsDefault(true);
+        }
+        if (sources.length === 0) setDirectError('No direct streams found for this title.');
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setDirectError(err?.message || 'Direct resolution failed.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDirectLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [details, type, id, selectedEpisode]);
+
+  // Resume position (seconds) for the direct player, from continue-watching.
+  const resumePosition = useMemo(() => {
+    const key = details?.id || id;
+    const entry = continueWatching.find((x) => x.id === key);
+    if (!entry?.positionSec) return 0;
+    // For series, only resume if it's the same episode.
+    if (type === 'series') {
+      const sameEp =
+        entry.season === selectedEpisode?.season && entry.episode === selectedEpisode?.episode;
+      return sameEp ? entry.positionSec : 0;
+    }
+    return entry.positionSec;
+  }, [details, id, continueWatching, type, selectedEpisode]);
+
   const seasons = useMemo(
     () =>
       type === 'series' && details?.episodes
@@ -104,34 +202,62 @@ export default function WatchEnglish() {
     [type, details, selectedSeason]
   );
 
-  const currentStreams = useMemo(() => {
+  /**
+   * Unified server list: Streamda Direct (our ad-free HLS proxy) first,
+   * then every existing embed provider — nothing is removed.
+   *
+   * Each entry carries a stable `key` ("direct:0", "embed:1", …) so the
+   * user's selection survives Direct sources loading in asynchronously.
+   */
+  const servers = useMemo(() => {
     if (!details) return [];
     const backendStreams =
       type === 'movies' ? details.streams || [] : selectedEpisode?.streams || [];
 
     // Front-load a verified ad-light provider (clean Next.js player, no
-    // pop-under networks detected) so it's the default pick.
+    // pop-under networks detected) for movies.
     // Movies only: vidlink's TV routes need TMDB ids, and our backend
     // speaks IMDB — series fall back to the backend's server list.
     const imdbId = details.id || id;
-    const merged =
+    const embeds =
       type === 'movies'
         ? [{ name: 'VidLink ✦', url: `https://vidlink.pro/movie/${imdbId}` }, ...backendStreams]
         : backendStreams;
     // De-dupe by URL in case the backend adds the same provider later.
     const seen = new Set();
-    return merged.filter((s) => {
+    const dedupedEmbeds = embeds.filter((s) => {
       if (seen.has(s.url)) return false;
       seen.add(s.url);
       return true;
     });
-  }, [details, type, selectedEpisode, id]);
 
-  const currentStream = currentStreams[Math.min(serverIndex, currentStreams.length - 1)];
+    const direct = directSources.map((s, i) => ({
+      key: `direct:${i}`,
+      kind: 'direct',
+      name: directSources.length > 1 ? `Streamda ✦ ${i + 1}` : 'Streamda ✦ Direct',
+      url: s.url,
+    }));
+    const embedServers = dedupedEmbeds.map((s, i) => ({
+      key: `embed:${i}`,
+      kind: 'embed',
+      name: s.name || `Server ${i + 1}`,
+      url: s.url,
+    }));
+    return [...direct, ...embedServers];
+  }, [details, type, selectedEpisode, id, directSources]);
+
+  // Default server: the user's explicit pick wins. Otherwise, if Direct
+  // resolved quickly (directIsDefault) use the first Direct source; else fall
+  // back to the first embed so playback starts instantly while Direct loads.
+  const activeServer =
+    servers.find((s) => s.key === serverKey) ||
+    (directIsDefault ? servers.find((s) => s.kind === 'direct') : null) ||
+    servers[0] ||
+    null;
 
   const selectEpisode = (ep) => {
     setSelectedEpisode(ep);
-    setServerIndex(0);
+    setServerKey(null);
     saveProgress({
       id: details.id || id,
       title: details.title,
@@ -152,6 +278,25 @@ export default function WatchEnglish() {
     } catch {
       showToast('Could not copy the link', 'error');
     }
+  };
+
+  // Real progress reporting for the direct player (unlike embeds, we can
+  // measure actual playback position here).
+  const handleDirectProgress = (seconds, duration) => {
+    if (!details) return;
+    const isSeries = type === 'series';
+    saveProgress({
+      id: details.id || id,
+      title: details.title,
+      type: isSeries ? 'series' : 'movies',
+      poster: details.poster || details.backdrop,
+      progress: duration > 0 ? Math.min(100, Math.round((seconds / duration) * 100)) : null,
+      positionSec: Math.floor(seconds),
+      durationSec: duration > 0 ? Math.floor(duration) : undefined,
+      season: isSeries ? selectedEpisode?.season : undefined,
+      episode: isSeries ? selectedEpisode?.episode : undefined,
+      watchLink: `/watch/english/${type}/${details.id || id}`,
+    });
   };
 
   if (loading) return <PageLoader label="Loading player" />;
@@ -227,10 +372,20 @@ export default function WatchEnglish() {
         {/* Player column */}
         <div className="space-y-5 min-w-0">
           <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-ink-700 shadow-card">
-            {currentStream ? (
+            {activeServer?.kind === 'direct' ? (
+              <VideoPlayer
+                key={activeServer.url}
+                hls
+                src={activeServer.url}
+                poster={details.backdrop || details.poster}
+                title={`${title} — Streamda Direct`}
+                initialTime={resumePosition}
+                onProgress={handleDirectProgress}
+              />
+            ) : activeServer ? (
               <iframe
-                key={currentStream.url}
-                src={currentStream.url}
+                key={activeServer.url}
+                src={activeServer.url}
                 className="w-full h-full"
                 title={`${title} player`}
                 allowFullScreen
@@ -250,34 +405,58 @@ export default function WatchEnglish() {
           </div>
 
           {/* Server picker */}
-          {currentStreams.length > 0 && (
+          {servers.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">
                 <Server size={13} /> Servers
               </span>
-              {currentStreams.map((s, idx) => (
-                <button
-                  key={s.url}
-                  onClick={() => setServerIndex(idx)}
-                  aria-pressed={idx === serverIndex}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold border transition-all duration-200 cursor-pointer ${
-                    idx === serverIndex
-                      ? 'bg-brand-500 border-brand-400 text-white shadow-glow'
-                      : 'bg-ink-800 border-ink-700 text-slate-300 hover:border-brand-500/40 hover:text-white'
-                  }`}
+              {servers.map((s) => {
+                const active = activeServer?.key === s.key;
+                const isDirect = s.kind === 'direct';
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() => setServerKey(s.key)}
+                    aria-pressed={active}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold border transition-all duration-200 cursor-pointer ${
+                      active
+                        ? isDirect
+                          ? 'bg-gradient-to-r from-brand-500 to-accent-500 border-brand-400 text-white shadow-glow'
+                          : 'bg-brand-500 border-brand-400 text-white shadow-glow'
+                        : isDirect
+                          ? 'bg-ink-800 border-brand-500/40 text-brand-300 hover:border-brand-400 hover:text-brand-200'
+                          : 'bg-ink-800 border-ink-700 text-slate-300 hover:border-brand-500/40 hover:text-white'
+                    }`}
+                  >
+                    {isDirect && <Zap size={12} className={active ? 'fill-current' : ''} />}
+                    {s.name}
+                  </button>
+                );
+              })}
+              {activeServer?.kind === 'embed' && (
+                <a
+                  href={activeServer.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
                 >
-                  {s.name || `Server ${idx + 1}`}
-                </button>
-              ))}
-              <a
-                href={currentStream?.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-auto flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                Open in new tab <ExternalLink size={11} />
-              </a>
+                  Open in new tab <ExternalLink size={11} />
+                </a>
+              )}
             </div>
+          )}
+
+          {/* Direct resolution status (only when it's informative) */}
+          {directLoading && (
+            <p className="flex items-center gap-2 text-[11px] text-slate-500">
+              <Loader2 size={12} className="animate-spin text-brand-400" />
+              Resolving ad-free Streamda Direct stream…
+            </p>
+          )}
+          {!directLoading && directError && servers.some((s) => s.kind === 'embed') && (
+            <p className="text-[11px] text-slate-500">
+              Streamda Direct unavailable ({directError}) — using an embed server instead.
+            </p>
           )}
 
           {/* About */}
@@ -393,8 +572,10 @@ export default function WatchEnglish() {
             <div className="bg-ink-900/70 border border-ink-700/60 rounded-2xl p-6 text-center lg:sticky lg:top-6">
               <h3 className="text-base font-bold text-white mb-2">Tips</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Pop-ups opened by players are blocked automatically. If a server still shows
-                overlay ads or buffers, switch to another one — VidLink ✦ is usually the cleanest.
+                <span className="text-brand-300 font-bold">Streamda ✦ Direct</span> is our own
+                ad-free player — no pop-ups, no overlays, and it remembers your position. If it's
+                unavailable for a title, pick an embed server instead; pop-ups from those are
+                blocked automatically.
               </p>
               <Link
                 to="/english"
