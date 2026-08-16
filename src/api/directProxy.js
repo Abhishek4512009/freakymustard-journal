@@ -12,7 +12,7 @@ import { fetchJson } from '../lib/http';
  * Override the base with VITE_DIRECT_PROXY if you self-host the proxy
  * (VITE_STREAMDA_PROXY is still honoured for backward compatibility).
  */
-const PROXY_BASE = (
+export const PROXY_BASE = (
   import.meta.env.VITE_DIRECT_PROXY ||
   import.meta.env.VITE_STREAMDA_PROXY ||
   'https://freakymustard67-potato.hf.space'

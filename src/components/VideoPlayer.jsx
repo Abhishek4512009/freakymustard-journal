@@ -15,6 +15,7 @@ import {
   Download,
 } from 'lucide-react';
 import { formatTime, clamp } from '../lib/format';
+import { triggerDownload } from '../lib/download';
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const CONTROLS_HIDE_MS = 2800;
@@ -245,19 +246,12 @@ export default function VideoPlayer({
 
   /* ---------------- download ---------------- */
 
-  // The proxy answers with Content-Disposition: attachment, so a plain anchor
-  // click is all it takes — the browser streams the file to disk natively.
-  const triggerDownload = useCallback(() => {
+  // Same-tab attachment download via lib/download — opening a window here
+  // would be killed by the app's own popup guard.
+  const handleDownloadClick = useCallback(() => {
     if (!downloadUrl) return;
     showControls();
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    onDownload?.();
+    triggerDownload(downloadUrl, { onStarted: onDownload });
   }, [downloadUrl, onDownload, showControls]);
 
   /* ---------------- speed ---------------- */
@@ -572,7 +566,7 @@ export default function VideoPlayer({
 
           {downloadUrl && (
             <button
-              onClick={triggerDownload}
+              onClick={handleDownloadClick}
               aria-label="Download video"
               title="Download (assembled by the FreakyMustard server)"
               className="p-2 text-white/80 hover:text-white transition-colors cursor-pointer"

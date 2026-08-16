@@ -19,6 +19,7 @@ import { useApp } from '../context/AppContext';
 import { usePageMeta } from '../hooks';
 import { cleanTitle } from '../lib/format';
 import { installPopupGuard } from '../lib/popupGuard';
+import { triggerDownload } from '../lib/download';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import VideoPlayer from '../components/VideoPlayer';
@@ -391,12 +392,16 @@ export default function WatchEnglish() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => {
-                // The proxy answers with an attachment, so this never leaves
-                // a visible tab behind — the browser just saves the file.
-                window.open(downloadUrl, '_blank', 'noopener');
-                handleDownloadStart();
-              }}
+              onClick={() =>
+                triggerDownload(downloadUrl, {
+                  onStarted: handleDownloadStart,
+                  onError: () =>
+                    showToast(
+                      'Download failed — the stream link may have expired. Reload the page and try again.',
+                      'error'
+                    ),
+                })
+              }
             >
               <Download size={14} /> <span className="hidden sm:inline">Download</span>
             </Button>

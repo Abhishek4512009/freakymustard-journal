@@ -1,3 +1,5 @@
+import { PROXY_BASE } from '../api/directProxy';
+
 /**
  * Pop-up defence for the parent page.
  *
@@ -9,9 +11,17 @@
  *  - neutralises window.open (providers sometimes escape via parent calls)
  *  - intercepts clicks on links that would open a new tab to an unknown host
  *  - auto-closes any window that does slip through
+ *
+ * Our own stream proxy is trusted — download/stream links must not be
+ * treated as provider pop-ups. (Downloads don't open windows at all, see
+ * lib/download.js; this keeps any future proxy link working too.)
  */
-
 const TRUSTED_HOSTS = new Set([window.location.host, 'github.com', 'www.github.com']);
+try {
+  TRUSTED_HOSTS.add(new URL(PROXY_BASE).host);
+} catch {
+  /* keep the static list if the proxy base is malformed */
+}
 
 let installed = false;
 
