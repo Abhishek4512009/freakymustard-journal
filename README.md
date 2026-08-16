@@ -62,13 +62,14 @@ src/
 
 ### Backend
 
-Content is served by a separate FastAPI backend (`moviesda-backend.onrender.com`):
+All content and streaming is served by one FastAPI service on Hugging Face Spaces (`freakymustard67-potato.hf.space`) — the former Render backend was merged into it:
 
 - `GET /api/english/{movies|series}/popular?skip=N` — paginated catalogue
 - `GET /api/english/{movies|series}/top` — top rated
 - `GET /api/english/genres` + `/api/english/{type}/genre/{genre}` — genre browsing
 - `GET /api/english/{movie|series}/{imdbId}` — details + stream servers
 - `GET /api/years`, `/api/movies?year_url=…`, `/api/search`, `/api/auto-stream?movie_url=…` — Tamil catalogue & stream resolution
+- `GET /resolve/…`, `/hls/{token}`, `/download/{token}` — FreakyMustard Direct streaming
 
 The frontend never scrapes directly; all fetching goes through the resilient `src/lib/http.js` wrapper.
 

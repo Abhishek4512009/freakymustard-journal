@@ -1,7 +1,10 @@
 import { fetchJson } from '../lib/http';
 import { isTamilNavigationItem } from '../lib/format';
+import { PROXY_BASE } from './directProxy';
 
-const API_BASE = 'https://moviesda-backend.onrender.com/api';
+// Content + streaming live on the same FreakyMustard service since the
+// Render backend was merged into the Space.
+const API_BASE = `${PROXY_BASE}/api`;
 
 /**
  * Tamil catalogue (moviesda scrape).
