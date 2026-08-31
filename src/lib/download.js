@@ -22,11 +22,30 @@
  *   URL is rejected (HTTP status) or unreachable (status null)
  * @returns {Promise<boolean>} true when the download was triggered
  */
-export async function triggerDownload(url, { onStarted, onError } = {}) {
+export async function triggerDownload(url, { onStarted, onError, filename } = {}) {
+  // For backup torrent URLs, append ?download=1 so the backend forces
+  // Content-Disposition: attachment (otherwise the engine sends inline
+  // and the browser navigates to a player). The filename is also used
+  // as the HTMLAnchorElement.download hint for same-origin URLs.
+  let fetchUrl = url;
+  let aFilename = filename || null;
+  if (url && url.includes('/backup/d/') && !url.includes('download=')) {
+    const sep = url.includes('?') ? '&' : '?';
+    fetchUrl = `${url}${sep}download=1`;
+    // derive filename from URL path if not provided: /d/<hash>/<idx>/<name>
+    if (!aFilename) {
+      try {
+        const u = new URL(url, window.location.href);
+        const last = u.pathname.split('/').pop();
+        if (last) aFilename = decodeURIComponent(last);
+      } catch {}
+    }
+  }
+
   let ok;
   let status = null;
   try {
-    const resp = await fetch(url);
+    const resp = await fetch(fetchUrl);
     status = resp.status;
     ok = resp.ok;
     // Headers are all we needed — stop the relay immediately so the proxy
@@ -45,8 +64,9 @@ export async function triggerDownload(url, { onStarted, onError } = {}) {
   }
 
   const a = document.createElement('a');
-  a.href = url;
+  a.href = fetchUrl;
   a.rel = 'noopener'; // no target: same-tab attachment download (see header)
+  if (aFilename) a.download = aFilename;
   document.body.appendChild(a);
   a.click();
   a.remove();
