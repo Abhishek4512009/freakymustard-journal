@@ -72,8 +72,11 @@ export async function fetchJson(url, options = {}) {
     if (cached !== undefined) return cached;
   }
 
-  // Dedup identical in-flight requests
-  if (inflight.has(url)) return inflight.get(url);
+  // Dedup identical in-flight requests — but never share an aborted
+  // request across a new signal (StrictMode remount). If the caller
+  // provided a signal, bypass dedup to avoid inheriting the previous
+  // controller's AbortError.
+  if (inflight.has(url) && !signal) return inflight.get(url);
 
   const attempt = async () => {
     let lastError;
