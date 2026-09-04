@@ -1,0 +1,28 @@
+/* FreakyMustard journal tokens — the entire palette. One accent, no exceptions. */
+
+:root {
+  --fm-paper: #f6f3ec;
+  --fm-paper-deep: #efe9db;
+  --fm-paper-flat: #faf8f2;
+  --fm-ink: #1a1512;
+  --fm-ink-soft: #4a443c;
+  --fm-muted: #7a7368;
+  --fm-faint: #a39a8a;
+  --fm-rule: #dcd4c2;
+  --fm-rule-strong: #1a1512;
+  --fm-accent: #a63223;
+  --fm-accent-deep: #7e241a;
+  --fm-good: #3d6b35;
+  --fm-screen: #12100d; /* dark islands only: player, stills */
+  --fm-screen-ink: #f2ede1;
+
+  --fm-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --fm-sans: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fm-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+
+  --fm-max: 1180px;
+  --fm-gutter: 20px;
+
+  --fm-r1: 2px;
+  --fm-r2: 3px;
+}

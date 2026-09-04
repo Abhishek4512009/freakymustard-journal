@@ -9,6 +9,13 @@ export default defineConfig({
     cssMinify: true,
     reportCompressedSize: true,
   },
+  // Allow tunnel hostnames (cloudflared/ngrok) in dev and preview.
+  server: {
+    allowedHosts: true,
+  },
+  preview: {
+    allowedHosts: true,
+  },
   test: {
     environment: 'jsdom',
     globals: true,

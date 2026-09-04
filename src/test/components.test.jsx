@@ -1,20 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import PosterCard from '../components/PosterCard';
-import Badge from '../components/ui/Badge';
-import SectionHeader from '../components/SectionHeader';
-import { EmptyState } from '../components/ui/States';
+import TitleCard from '../components/TitleCard';
+import { Section } from '../components/Shelf';
+import { Empty } from '../components/Notices';
 
 beforeEach(() => {
   localStorage.clear();
 });
 
-describe('PosterCard', () => {
-  it('renders english item with rating and links to watch page', () => {
+describe('TitleCard', () => {
+  it('renders an english item and links to the new watch route', () => {
     render(
       <MemoryRouter>
-        <PosterCard
+        <TitleCard
           item={{
             id: 'tt123',
             title: 'Test Movie (2024)',
@@ -26,25 +25,25 @@ describe('PosterCard', () => {
       </MemoryRouter>
     );
     const link = screen.getByRole('link', { name: /watch test movie/i });
-    expect(link).toHaveAttribute('href', '/watch/english/movies/tt123');
-    expect(screen.getByText('8.2')).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/watch/movie/tt123');
+    expect(screen.getByText('8.2', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('Test Movie')).toBeInTheDocument();
   });
 
-  it('renders tamil item link from .link', () => {
+  it('renders a tamil item link from .link', () => {
     render(
       <MemoryRouter>
-        <PosterCard item={{ title: 'Leo (2023)', link: 'https://x.co/leo' }} />
+        <TitleCard item={{ title: 'Leo (2023)', link: 'https://x.co/leo' }} />
       </MemoryRouter>
     );
     const link = screen.getByRole('link', { name: /watch leo/i });
     expect(link.getAttribute('href')).toContain('/watch/tamil/');
   });
 
-  it('shows fallback when image fails', async () => {
+  it('shows a flat fallback when the image fails', async () => {
     const { container } = render(
       <MemoryRouter>
-        <PosterCard
+        <TitleCard
           item={{ id: 'tt9', title: 'Broken Poster', poster: 'https://img.test/broken.jpg' }}
         />
       </MemoryRouter>
@@ -55,29 +54,25 @@ describe('PosterCard', () => {
   });
 });
 
-describe('Badge', () => {
-  it('renders children with tone classes', () => {
-    render(<Badge tone="brand">HD</Badge>);
-    expect(screen.getByText('HD')).toBeInTheDocument();
-  });
-});
-
-describe('SectionHeader', () => {
-  it('renders title and explore link', () => {
+describe('Section', () => {
+  it('renders a numbered heading with index link', () => {
     render(
       <MemoryRouter>
-        <SectionHeader title="Trending" to="/english" />
+        <Section no="01" title="Films" to="/films" count={12}>
+          <p>body</p>
+        </Section>
       </MemoryRouter>
     );
-    expect(screen.getByText('Trending')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /explore all/i })).toHaveAttribute('href', '/english');
+    expect(screen.getByText('Films')).toBeInTheDocument();
+    expect(screen.getByText('01')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /full index/i })).toHaveAttribute('href', '/films');
   });
 });
 
-describe('EmptyState', () => {
+describe('Empty', () => {
   it('renders title and message', () => {
-    render(<EmptyState title="Nothing here" message="Try again later" />);
-    expect(screen.getByText('Nothing here')).toBeInTheDocument();
+    render(<Empty title="A blank page." message="Try again later" />);
+    expect(screen.getByText('A blank page.')).toBeInTheDocument();
     expect(screen.getByText('Try again later')).toBeInTheDocument();
   });
 });

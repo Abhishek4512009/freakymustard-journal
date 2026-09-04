@@ -6,7 +6,7 @@ import {
   clamp,
   isTamilNavigationItem,
   watchLinkFor,
-  ratingColor,
+  ratingTone,
 } from '../lib/format';
 
 describe('cleanTitle', () => {
@@ -70,15 +70,20 @@ describe('watchLinkFor', () => {
     expect(link).toContain('title=Leo%20(2023)');
   });
   it('builds english links from .id items', () => {
-    expect(watchLinkFor({ id: 'tt123' }, 'series')).toBe('/watch/english/series/tt123');
+    expect(watchLinkFor({ id: 'tt123' }, 'series')).toBe('/watch/series/tt123');
+    expect(watchLinkFor({ id: 'tt123' }, 'movies')).toBe('/watch/movie/tt123');
+  });
+  it('builds tamil series links for series kinds', () => {
+    const link = watchLinkFor({ link: 'https://x.co/s', title: 'S', kind: 'series' });
+    expect(link).toContain('/watch/tamil-series/');
   });
 });
 
-describe('ratingColor', () => {
-  it('maps rating ranges to colors', () => {
-    expect(ratingColor('8.5')).toContain('emerald');
-    expect(ratingColor('7.0')).toContain('amber');
-    expect(ratingColor('5.0')).toContain('orange');
-    expect(ratingColor('n/a')).toContain('slate');
+describe('ratingTone', () => {
+  it('maps rating ranges to tones', () => {
+    expect(ratingTone('8.5')).toBe('high');
+    expect(ratingTone('7.0')).toBe('mid');
+    expect(ratingTone('5.0')).toBe('low');
+    expect(ratingTone('n/a')).toBe('low');
   });
 });

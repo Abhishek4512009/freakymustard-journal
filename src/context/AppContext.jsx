@@ -11,34 +11,20 @@ import { storage, migrateV1 } from '../lib/storage';
 
 const AppContext = createContext(null);
 
-const DEFAULT_PROFILES = [
-  { id: 'primary', name: 'Primary', emoji: '😎', gradient: 'from-brand-500 to-accent-500' },
-  { id: 'tamil', name: 'Tamil Cinema Fan', emoji: '🎬', gradient: 'from-rose-500 to-orange-500' },
-  { id: 'series', name: 'Series Binger', emoji: '🍿', gradient: 'from-violet-500 to-fuchsia-500' },
-  { id: 'kids', name: 'Kids Zone', emoji: '🦄', gradient: 'from-emerald-500 to-teal-500' },
-];
-
 const MAX_WATCHLIST = 200;
 const MAX_CONTINUE = 12;
 const MAX_RECENT_SEARCHES = 8;
 
 let toastSeq = 0;
 
+/**
+ * Single-reader journal state: one watchlist, one reading history
+ * (continue watching), recent searches, toasts. No profiles — this is
+ * a printed page, not a household.
+ */
 export const AppProvider = ({ children }) => {
   // Run v1 -> v2 storage migration once, before first state read.
   useMemo(() => migrateV1(), []);
-
-  /* ---------------- Profiles ---------------- */
-  const [profiles] = useState(DEFAULT_PROFILES);
-  const [activeProfileId, setActiveProfileId] = useState(() =>
-    storage.get('activeProfile', 'primary')
-  );
-  const activeProfile = profiles.find((p) => p.id === activeProfileId) || profiles[0];
-
-  const switchProfile = useCallback((id) => {
-    setActiveProfileId(id);
-    storage.set('activeProfile', id);
-  }, []);
 
   /* ---------------- Watchlist ---------------- */
   const [watchlist, setWatchlist] = useState(() => storage.get('watchlist', []));
@@ -166,9 +152,6 @@ export const AppProvider = ({ children }) => {
 
   const value = useMemo(
     () => ({
-      profiles,
-      activeProfile,
-      switchProfile,
       watchlist,
       addToWatchlist,
       removeFromWatchlist,
@@ -184,9 +167,6 @@ export const AppProvider = ({ children }) => {
       dismissToast,
     }),
     [
-      profiles,
-      activeProfile,
-      switchProfile,
       watchlist,
       addToWatchlist,
       removeFromWatchlist,

@@ -38,7 +38,9 @@ export async function triggerDownload(url, { onStarted, onError, filename } = {}
         const u = new URL(url, window.location.href);
         const last = u.pathname.split('/').pop();
         if (last) aFilename = decodeURIComponent(last);
-      } catch {}
+      } catch {
+        /* unparseable URL — fall through without a filename hint */
+      }
     }
   }
 

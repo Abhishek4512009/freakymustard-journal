@@ -1,21 +1,18 @@
-import { Suspense, lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
+import { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import Masthead from './components/Masthead';
+import Footer from './components/Footer';
 import ErrorBoundary from './components/ErrorBoundary';
-import ToastStack from './components/ui/ToastStack';
-import { PageLoader } from './components/ui/Skeleton';
+import { Loading, Toasts } from './components/Notices';
 import { AppProvider } from './context/AppContext';
 
-// Route-level code splitting: each page is its own chunk.
-const Home = lazy(() => import('./pages/Home'));
+// One chunk per section.
+const FrontPage = lazy(() => import('./pages/FrontPage'));
+const Catalogue = lazy(() => import('./pages/Catalogue'));
 const Search = lazy(() => import('./pages/Search'));
-const Profile = lazy(() => import('./pages/Profile'));
-const Watchlist = lazy(() => import('./pages/Watchlist'));
-const EnglishPortal = lazy(() => import('./pages/EnglishPortal'));
-const TamilPortal = lazy(() => import('./pages/TamilPortal'));
-const WatchEnglish = lazy(() => import('./pages/WatchEnglish'));
-const WatchTamil = lazy(() => import('./pages/WatchTamil'));
-const WatchTamilSeries = lazy(() => import('./pages/WatchTamilSeries'));
+const Saved = lazy(() => import('./pages/Saved'));
+const UnifiedWatch = lazy(() => import('./pages/UnifiedWatch'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 /** Reset scroll on navigation. */
@@ -27,30 +24,55 @@ function ScrollToTop() {
   return null;
 }
 
+/** Legacy English watch links (/watch/english/movies|series/:id) → new scheme. */
+function EnglishWatchRedirect() {
+  const { type, id } = useParams();
+  const kind = type === 'series' ? 'series' : 'movie';
+  return <Navigate to={`/watch/${kind}/${id}`} replace />;
+}
+
 function Shell() {
   return (
-    <div className="flex min-h-screen bg-ink-950 text-white">
-      <Sidebar />
-      <main className="flex-1 md:ml-[88px] min-w-0 pb-16 md:pb-0">
-        <Suspense fallback={<PageLoader label="Loading" />}>
+    <div className="fm-page">
+      <Masthead />
+      <main>
+        <Suspense fallback={<Loading label="Turning the page" />}>
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<FrontPage />} />
+            <Route path="/films" element={<Catalogue kind="films" />} />
+            <Route path="/series" element={<Catalogue kind="series" />} />
+            <Route path="/tamil" element={<Catalogue kind="tamil" />} />
             <Route path="/search" element={<Search />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/watchlist" element={<Watchlist />} />
-            <Route path="/english" element={<EnglishPortal type="movies" />} />
-            <Route path="/english/series" element={<EnglishPortal type="series" key="series" />} />
-            <Route path="/tamil" element={<TamilPortal />} />
-            <Route path="/watch/english/:type/:id" element={<WatchEnglish />} />
-            <Route path="/watch/tamil/:encodedUrl" element={<WatchTamil />} />
-            <Route path="/watch/tamil-series/:encodedUrl" element={<WatchTamilSeries />} />
+            <Route path="/saved" element={<Saved />} />
+            <Route path="/watch/:kind/:id" element={<UnifiedWatch />} />
+
+            {/* Legacy routes from the previous edition */}
+            <Route path="/english" element={<Navigate to="/films" replace />} />
+            <Route path="/english/series" element={<Navigate to="/series" replace />} />
+            <Route path="/watch/english/:type/:id" element={<EnglishWatchRedirect />} />
+            <Route path="/watch/tamil/:encodedUrl" element={<TamilRedirect kind="tamil" />} />
+            <Route
+              path="/watch/tamil-series/:encodedUrl"
+              element={<TamilRedirect kind="tamil-series" />}
+            />
+            <Route path="/watchlist" element={<Navigate to="/saved" replace />} />
+            <Route path="/profile" element={<Navigate to="/saved" replace />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>
-      <ToastStack />
+      <Footer />
+      <Toasts />
     </div>
   );
+}
+
+/** Legacy Tamil links keep their encoded print URL, only the prefix changes. */
+function TamilRedirect({ kind }) {
+  const { encodedUrl } = useParams();
+  const { search } = useLocation();
+  return <Navigate to={`/watch/${kind}/${encodedUrl}${search}`} replace />;
 }
 
 export default function App() {

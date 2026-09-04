@@ -1,5 +1,5 @@
 /**
- * Formatting & content helpers shared across the app.
+ * Formatting & content helpers shared across the journal.
  */
 
 /** Strip trailing "(2024)" year suffixes from scraped titles. */
@@ -42,21 +42,24 @@ export function isTamilNavigationItem(item) {
   );
 }
 
-/** Build the internal watch route for any content item. */
+/**
+ * Build the internal watch route for any content item.
+ * Single scheme: /watch/movie|series|tamil|tamil-series/:id
+ */
 export function watchLinkFor(item, type = 'movies') {
   if (item?.link) {
-    const base =
-      item.kind === 'series' || type === 'tamil-series' ? '/watch/tamil-series' : '/watch/tamil';
-    return `${base}/${encodeURIComponent(item.link)}?title=${encodeURIComponent(item.title || '')}`;
+    const kind = item.kind === 'series' || type === 'tamil-series' ? 'tamil-series' : 'tamil';
+    return `/watch/${kind}/${encodeURIComponent(item.link)}?title=${encodeURIComponent(item.title || '')}`;
   }
-  return `/watch/english/${type}/${item?.id}`;
+  const kind = type === 'series' ? 'series' : 'movie';
+  return `/watch/${kind}/${item?.id}`;
 }
 
-/** Deterministic pseudo-rating color for badges. */
-export function ratingColor(rating) {
+/** Rating tone for the flat journal rating mark. high | mid | low */
+export function ratingTone(rating) {
   const n = parseFloat(rating);
-  if (!Number.isFinite(n)) return 'text-slate-400';
-  if (n >= 8) return 'text-emerald-400';
-  if (n >= 6.5) return 'text-amber-400';
-  return 'text-orange-400';
+  if (!Number.isFinite(n)) return 'low';
+  if (n >= 7.5) return 'high';
+  if (n >= 6) return 'mid';
+  return 'low';
 }

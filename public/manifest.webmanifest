@@ -1,14 +1,14 @@
 {
-  "name": "FreakyMustard — English & Tamil Movies",
+  "name": "FreakyMustard — An Editorial Streaming Journal",
   "short_name": "FreakyMustard",
-  "description": "A fast, beautiful streaming portal for the latest English movies & series and Tamil movies.",
+  "description": "English films, series and Tamil cinema, set like a printed film journal.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#05070d",
-  "theme_color": "#05070d",
+  "background_color": "#F6F3EC",
+  "theme_color": "#F6F3EC",
   "categories": ["entertainment", "video"],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
@@ -17,8 +17,8 @@
   ],
   "shortcuts": [
     { "name": "Search", "url": "/search", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "English Movies", "url": "/english" },
-    { "name": "Tamil Movies", "url": "/tamil" },
-    { "name": "My Space", "url": "/profile" }
+    { "name": "Films", "url": "/films" },
+    { "name": "Tamil Cinema", "url": "/tamil" },
+    { "name": "Saved", "url": "/saved" }
   ]
 }

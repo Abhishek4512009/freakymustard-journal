@@ -14,7 +14,6 @@ function Harness() {
     <div>
       <span data-testid="wl-count">{app.watchlist.length}</span>
       <span data-testid="cw-count">{app.continueWatching.length}</span>
-      <span data-testid="profile">{app.activeProfile.id}</span>
       <button onClick={() => app.addToWatchlist({ id: 'tt1', title: 'Movie A', type: 'movies' })}>
         add
       </button>
@@ -36,7 +35,6 @@ function Harness() {
       >
         progress-null
       </button>
-      <button onClick={() => app.switchProfile('tamil')}>switch</button>
       <button onClick={() => app.addRecentSearch('leo')}>search</button>
       <span data-testid="recent">{app.recentSearches.join(',')}</span>
     </div>
@@ -85,13 +83,6 @@ describe('AppContext', () => {
     await waitFor(() => {
       expect(localStorage.getItem('freakymustard:v2:watchlist')).toContain('tt1');
     });
-  });
-
-  it('switches profiles', async () => {
-    const user = userEvent.setup();
-    setup();
-    await user.click(screen.getByText('switch'));
-    expect(screen.getByTestId('profile')).toHaveTextContent('tamil');
   });
 
   it('tracks recent searches without duplicates', async () => {

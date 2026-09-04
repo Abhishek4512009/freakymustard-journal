@@ -6,7 +6,7 @@
  *  - API calls: never cached here (the app has its own TTL cache).
  */
 
-const VERSION = 'freakymustard-v2-1';
+const VERSION = 'freakymustard-v3-0';
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 

@@ -1,27 +1,44 @@
-# FreakyMustard 🎬
+# FreakyMustard — An Editorial Streaming Journal
 
-A fast, beautiful streaming portal for **English movies & series** and **Tamil cinema** — built with React 19, Vite 8 and Tailwind CSS v4.
+English films, series and Tamil cinema, set like a printed film journal:
+paper surfaces, serif headlines, numbered sections, one oxblood accent.
+No gradients, no glass, no glow.
 
-![FreakyMustard](public/og-cover.png)
+## Sections
 
-## Features
+| Route | What it is |
+|---|---|
+| `/` | Front page — one cover story, continue-reading ledger, numbered shelves |
+| `/films` | English film index (popular, top-rated, by genre) |
+| `/series` | Series index (popular, top-rated, by genre) |
+| `/tamil` | Tamil archive (by year + web series) |
+| `/search` | The index — unified search across all three |
+| `/saved` | Your list + continue reading (browser-local only) |
+| `/watch/movie/:imdb` | Screening room — house print, exchange prints, further prints |
+| `/watch/series/:imdb` | Screening room + episode index |
+| `/watch/tamil/:encodedUrl` | Tamil archive print |
+| `/watch/tamil-series/:encodedUrl` | Tamil series screening room |
 
-- **Two portals, one app** — Hollywood (IMDB-backed metadata, multiple stream servers) and Tamil cinema (year-wise catalogue, direct quality-resolved streams).
-- **FreakyMustard ✦ Direct** — our own ad-free HLS player (hls.js) fed by a self-hosted resolution proxy; real progress tracking + resume, with third-party embed servers kept as fallback.
-- **Downloads** — one click saves the Direct stream as a single MPEG-TS file, assembled server-side by the FreakyMustard proxy (no in-tab blob, native browser download).
-- **Cinematic hero** — auto-rotating featured slides with crossfading backdrops.
-- **Unified search** — debounced live search across English movies, series and Tamil movies with recent & trending suggestions.
-- **Custom video player** — for Tamil direct streams: gestures (double-tap seek), keyboard shortcuts, speed control, PiP, fullscreen, buffering states, skip-intro.
-- **Watchlist & Continue Watching** — persisted locally, with real resume positions for direct streams.
-- **Multi-profile** — switch between household profiles.
-- **Genre & year browsing** — genre chips with pagination for English, year chips for Tamil.
-- **Production-grade plumbing**:
-  - Resilient HTTP layer: timeouts, retries with backoff (handles Render free-tier cold starts), request dedup, TTL cache, abort-on-unmount.
-  - Route-level code splitting (every page is its own lazy chunk).
-  - PWA: installable, app-shell service worker for instant repeat loads.
-  - Error boundary, 404 page, skeleton loaders, empty/error states everywhere.
-  - Accessibility: focus-visible rings, focus-trapped modals, aria labels, reduced-motion support.
-  - 32 unit tests (Vitest + Testing Library), ESLint + Prettier, GitHub Actions CI.
+Legacy routes (`/english`, `/watchlist`, `/profile`, old watch URLs) redirect
+to their new equivalents so saved links keep working.
+
+## Styling
+
+Vanilla CSS in `src/styles/` — `tokens.css` (the whole palette: paper, ink,
+one accent), `base.css`, `journal.css` (every component class, `fm-`
+prefixed). No Tailwind, no utility soup. The video frame is the only dark
+surface. Motion is opacity-only; `prefers-reduced-motion` is respected.
+
+Type: Fraunces (display serif) + Inter (body) via Google Fonts; system mono
+for metadata.
+
+## Backend
+
+All content resolves through one FastAPI press on Hugging Face Spaces
+(`freakymustard67-potato.hf.space`): `src/api/` holds the four endpoint
+modules (english, tamil, direct HLS proxy, backup prints). The frontend never
+scrapes directly; `src/lib/http.js` wraps fetching with timeouts, retries,
+dedup and a small TTL cache.
 
 ## Getting started
 
@@ -30,57 +47,21 @@ npm install
 npm run dev        # local dev server
 ```
 
-### Scripts
-
-| Command             | What it does                    |
-| ------------------- | ------------------------------- |
-| `npm run dev`       | Start Vite dev server with HMR  |
-| `npm run build`     | Production build to `dist/`     |
-| `npm run preview`   | Preview the production build    |
-| `npm run lint`      | ESLint                          |
-| `npm run format`    | Prettier write                  |
-| `npm test`          | Run the Vitest suite            |
-
-## Architecture
-
-```
-src/
-├── api/            # Backend endpoint modules (english, tamil)
-├── components/
-│   ├── ui/         # Design-system primitives (Button, Badge, Modal, Skeleton, Toast…)
-│   ├── HeroBanner  # Rotating hero carousel
-│   ├── MovieCarousel  # Drag-scroll poster shelf + continue-watching cards
-│   ├── PosterCard  # Poster tile (English + Tamil shapes)
-│   ├── VideoPlayer # Custom HTML5 player
-│   └── Sidebar     # Desktop rail + mobile bottom bar
-├── context/        # AppContext: watchlist, progress, profiles, toasts
-├── hooks/          # useApi, useDebouncedValue, usePageMeta, useMediaQuery
-├── lib/            # http (retry/cache/dedup), storage, format utils
-├── pages/          # Home, EnglishPortal, TamilPortal, Search, Watch*, Profile, Watchlist, 404
-└── test/           # Vitest suites
-```
-
-### Backend
-
-All content and streaming is served by one FastAPI service on Hugging Face Spaces (`freakymustard67-potato.hf.space`) — the former Render backend was merged into it:
-
-- `GET /api/english/{movies|series}/popular?skip=N` — paginated catalogue
-- `GET /api/english/{movies|series}/top` — top rated
-- `GET /api/english/genres` + `/api/english/{type}/genre/{genre}` — genre browsing
-- `GET /api/english/{movie|series}/{imdbId}` — details + stream servers
-- `GET /api/years`, `/api/movies?year_url=…`, `/api/search`, `/api/auto-stream?movie_url=…` — Tamil catalogue & stream resolution
-- `GET /resolve/…`, `/hls/{token}`, `/download/{token}` — FreakyMustard Direct streaming
-
-The frontend never scrapes directly; all fetching goes through the resilient `src/lib/http.js` wrapper.
-
-## Deployment
-
-Static build — deploy `dist/` anywhere (Netlify, Vercel, Cloudflare Pages, GitHub Pages). The service worker and manifest make it installable as a PWA. SPA routing requires a rewrite rule (`/* -> /index.html`) on most hosts.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start Vite dev server with HMR |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | ESLint |
+| `npm test` | Run the Vitest suite |
 
 ## Notes
 
-- Stream sources are third-party embeds (iframes are NOT sandboxed — providers reject sandboxed embeds); the app defends against pop-ups/redirects with a popup guard and `noreferrer`. The preferred source is FreakyMustard ✦ Direct, which bypasses embeds entirely.
-- Watchlist/progress live in `localStorage` only — no accounts, no tracking.
+- Playback preference: house print (our ad-free HLS booth) → exchange embeds
+  (iframes, popup-guarded) → further prints (as-is, collapsible).
+- Saved list and reading history live in `localStorage` only — no accounts.
+- Static build — deploy `dist/` anywhere. SPA routing needs a rewrite rule
+  (`/* -> /index.html`, see `vercel.json`).
 
 ## License
 
